@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 export function useCaseDrag(setPans) {
   const [panDragId, setPanDragId] = useState(null);
-  const [insertTarget, setInsertTarget] = useState(null);
+  const [insertTarget, setInsertTargetState] = useState(null);
+  const insertTargetRef = useRef(null);
+
+  const setInsertTarget = (val) => {
+    const resolved = typeof val === "function" ? val(insertTargetRef.current) : val;
+    insertTargetRef.current = resolved;
+    setInsertTargetState(resolved);
+  };
 
   const onPanDragStart = (e, id) => setPanDragId(id);
 
@@ -20,18 +27,19 @@ export function useCaseDrag(setPans) {
   };
 
   const onPanDrop = (e, targetId) => {
-    if (!panDragId || panDragId === targetId || !insertTarget) {
+    if (!panDragId || panDragId === targetId || !insertTargetRef.current) {
       setInsertTarget(null);
       setPanDragId(null);
       return;
     }
     e.preventDefault();
+    const it = insertTargetRef.current;
     setPans((prev) => {
       const arr = [...prev];
       const si = arr.findIndex((p) => p.id === panDragId);
       const [moved] = arr.splice(si, 1);
       let ti = arr.findIndex((p) => p.id === targetId);
-      if (insertTarget.side === "right") ti += 1;
+      if (it.side === "right") ti += 1;
       arr.splice(ti, 0, moved);
       return arr;
     });
@@ -47,6 +55,7 @@ export function useCaseDrag(setPans) {
   return {
     panDragId,
     insertTarget,
+    insertTargetRef,
     setInsertTarget,
     setPanDragId,
     onPanDragStart,

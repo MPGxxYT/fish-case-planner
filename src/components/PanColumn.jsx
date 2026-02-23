@@ -9,13 +9,14 @@ const DEPTH_OPTIONS = [
   { key: "third", label: "Third" },
 ];
 
-export default function PanColumn({ pan, products, onAssignProduct, onClearSlot, onDirectClearSlot, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd }) {
+export default function PanColumn({ pan, products, onAssignProduct, onClearSlot, onDirectClearSlot, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, startTouchDrag, isMobile }) {
   const ds = getDepthSlots(pan.depth);
   const isSplit = pan.depth !== "full";
   const maxAllowed = (remainingWidth || 0) + pan.width;
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef();
   const triggerRef = useRef();
+  const headerRef = useRef();
   const [menuPos, setMenuPos] = useState({ left: 0, top: 0 });
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
     <div style={{ position: "relative", display: "flex", height: "100%" }}>
       {insertIndicator === "left" && <div style={{ position: "absolute", left: -2, top: 0, bottom: 0, width: 4, background: T.accent, borderRadius: 2, zIndex: 10 }} />}
       <div
+        data-pan-id={pan.id}
         onDragOver={(e) => onPanDragOver(e, pan.id)}
         onDrop={(e) => onPanDrop(e, pan.id)}
         style={{
@@ -51,11 +53,13 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
       >
         {/* Header — draggable for pan reordering */}
         <div
+          ref={headerRef}
           draggable
           onDragStart={(e) => { e.dataTransfer.setData("dragType", "pan"); e.dataTransfer.setData("panId", pan.id); onPanDragStart(e, pan.id); }}
           onDragEnd={onPanDragEnd}
+          onTouchStart={(e) => startTouchDrag(e, { type: "pan", panId: pan.id }, headerRef)}
           style={{
-            height: 34, background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`,
+            height: isMobile ? 44 : 34, background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexShrink: 0, position: "relative",
             cursor: "grab",
           }}
@@ -162,6 +166,7 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
               onAssignProduct={onAssignProduct} onClearSlot={onClearSlot} onDirectClearSlot={onDirectClearSlot}
               onSetSlotType={onSetSlotType}
               totalDepthSlots={ds.length}
+              startTouchDrag={startTouchDrag}
             />
           ))}
         </div>

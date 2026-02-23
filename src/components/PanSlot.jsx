@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { T, FONT, DFONT, PRODUCT_COLORS, DEPTH_UNITS, CASE_DEPTH, PRODUCT_LABELS } from "../utils/constants.js";
 import { getSlotLabel } from "../utils/helpers.js";
 
-export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onClearSlot, onDirectClearSlot, onSetSlotType, totalDepthSlots }) {
+export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onClearSlot, onDirectClearSlot, onSetSlotType, totalDepthSlots, startTouchDrag }) {
   const [dOver, setDOver] = useState(false);
+  const slotRef = useRef();
   const product = pan.slots[slotIdx] ? products.find((p) => p.id === pan.slots[slotIdx]) : null;
   const color = product ? (PRODUCT_COLORS[product.color] || PRODUCT_COLORS.cool) : null;
   const depthLabel = getSlotLabel(pan.depth, slotIdx);
@@ -13,6 +14,10 @@ export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onCle
 
   return (
     <div
+      ref={slotRef}
+      data-drop-type="slot"
+      data-pan-id={pan.id}
+      data-slot-idx={slotIdx}
       draggable={!!product}
       onDragStart={product ? (e) => {
         e.stopPropagation();
@@ -20,6 +25,9 @@ export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onCle
         e.dataTransfer.setData("dragType", "slotProduct");
         e.dataTransfer.setData("srcPanId", pan.id);
         e.dataTransfer.setData("srcSlotIdx", String(slotIdx));
+      } : undefined}
+      onTouchStart={product ? (e) => {
+        startTouchDrag(e, { type: "slotProduct", productId: product.id, srcPanId: pan.id, srcSlotIdx: slotIdx }, slotRef);
       } : undefined}
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDOver(true); }}
       onDragLeave={() => setDOver(false)}

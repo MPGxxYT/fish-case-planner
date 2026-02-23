@@ -6,6 +6,8 @@ import { checkColorConflicts } from "./utils/colorConflicts.js";
 import { DEFAULT_PRODUCTS } from "./data/defaultProducts.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useCaseDrag } from "./hooks/useCaseDrag.js";
+import { useIsMobile } from "./hooks/useIsMobile.js";
+import { useTouchDrag } from "./hooks/useTouchDrag.js";
 import ConfirmDialog from "./components/ConfirmDialog.jsx";
 import ProductFormModal from "./components/ProductFormModal.jsx";
 import ProductPool from "./components/ProductPool.jsx";
@@ -29,13 +31,16 @@ export default function App() {
   const [showPrint, setShowPrint] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearSlotConfirm, setClearSlotConfirm] = useState(null);
-  const [confirmExpand, setConfirmExpand] = useState(null); // { productId, insertIdx, product }
+  const [confirmExpand, setConfirmExpand] = useState(null);
 
-  const { panDragId, insertTarget, setInsertTarget, setPanDragId, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd } = useCaseDrag(setPans);
+  const { isMobile, isPortrait } = useIsMobile();
+  const [portraitDismissed, setPortraitDismissed] = useState(false);
+  const { panDragId, insertTarget, insertTargetRef, setInsertTarget, setPanDragId, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd } = useCaseDrag(setPans);
 
   const usedWidth = pans.reduce((s, p) => s + p.width, 0);
   const remainingWidth = caseWidth - usedWidth;
@@ -111,6 +116,14 @@ export default function App() {
     setClearSlotConfirm(null);
   };
 
+  const { startTouchDrag } = useTouchDrag({
+    setInsertTarget, setPanDragId, insertTargetRef,
+    onAssignProduct: assignProduct,
+    onCreatePanFromProduct: createPanFromProduct,
+    onDirectClearSlot: directClearSlot,
+    pans, setPans,
+  });
+
   const handleProductSave = (prod) => {
     setProducts((ps) => {
       const idx = ps.findIndex((p) => p.id === prod.id);
@@ -137,6 +150,10 @@ export default function App() {
   const loadCase = (c) => { setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); };
   const deleteCase = (idx) => setSavedCases((sc) => sc.filter((_, i) => i !== idx));
 
+  // Close drawer immediately at touchstart — safe because ProductPool stays mounted (CSS-only hide)
+  const poolStartTouchDrag = (e, dragInfo, sourceEl) => { setDrawerOpen(false); startTouchDrag(e, dragInfo, sourceEl); };
+  const poolProps = { products, filters, setFilters, onEdit: (p) => setShowProductForm(p), onDelete: deleteProduct, startTouchDrag: poolStartTouchDrag, isMobile };
+
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: DFONT }}>
       <header style={{ padding: "10px 16px", background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -145,25 +162,33 @@ export default function App() {
           <h1 style={{ margin: 0, fontSize: 16, fontWeight: 800, fontFamily: DFONT, background: `linear-gradient(135deg,${T.accent},#818cf8)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Case Planner</h1>
         </div>
         <div style={{ flex: 1 }} />
-        <button style={S.hb} onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? "◀ Hide" : "📦 Products"}</button>
+        {!isMobile && <button style={S.hb} onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? "◀ Hide" : "📦 Products"}</button>}
         <button style={S.hb} onClick={() => setShowAutoGen(true)}>⚡ Auto</button>
         <button style={S.hb} onClick={() => setShowSaved(true)}>📁 Saved</button>
         <button style={S.hb} onClick={() => setShowPrint(true)}>🖨 Print</button>
       </header>
 
+      {isMobile && isPortrait && !portraitDismissed && (
+        <div style={{ padding: "7px 14px", background: T.warning + "18", borderBottom: `1px solid ${T.warning}28`, display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 15 }}>⟳</span>
+          <span style={{ flex: 1, fontSize: 11, color: T.warning, fontFamily: FONT }}>Rotate to landscape for the best experience</span>
+          <button onClick={() => setPortraitDismissed(true)} style={{ background: "none", border: "none", color: T.textDim, cursor: "pointer", fontSize: 16, padding: "0 2px", lineHeight: 1 }}>×</button>
+        </div>
+      )}
       <div style={{ display: "flex", minHeight: "calc(100vh - 50px)" }}>
-        {sidebarOpen && (
+        {/* Desktop sidebar */}
+        {!isMobile && sidebarOpen && (
           <aside style={{ width: 280, minWidth: 280, padding: 10, background: T.surface, borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
               <h3 style={{ margin: 0, fontSize: 13, color: T.textMuted, fontFamily: FONT }}>PRODUCT POOL</h3>
               <button style={{ ...S.bp, fontSize: 10, padding: "3px 10px" }} onClick={() => setShowProductForm("new")}>+ New</button>
             </div>
             <p style={{ fontSize: 10, color: T.textDim, margin: "0 0 8px", lineHeight: 1.4 }}>Drag products into pan slots</p>
-            <ProductPool products={products} filters={filters} setFilters={setFilters} onEdit={(p) => setShowProductForm(p)} onDelete={deleteProduct} />
+            <ProductPool {...poolProps} />
           </aside>
         )}
 
-        <main style={{ flex: 1, padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
+        <main style={{ flex: 1, padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? 52 + 14 : 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
               Case:<input type="number" value={caseWidth} onChange={(e) => setCaseWidth(Math.max(usedWidth, Math.max(1, +e.target.value)))} style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }} />
@@ -193,6 +218,7 @@ export default function App() {
             insertTarget={insertTarget} onPanDragStart={onPanDragStart}
             onPanDragOver={onPanDragOver} onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
             setInsertTarget={setInsertTarget} setPanDragId={setPanDragId} panDragId={panDragId}
+            isMobile={isMobile} startTouchDrag={startTouchDrag}
           />
 
           {colorWarnings.length > 0 && (
@@ -202,6 +228,38 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {/* Mobile bottom drawer */}
+      {isMobile && (
+        <>
+          {drawerOpen && (
+            <div onClick={() => setDrawerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }} />
+          )}
+          <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 300,
+            background: T.surface, borderTop: `1px solid ${T.borderLight}`,
+            borderRadius: "12px 12px 0 0",
+            height: drawerOpen ? "52vh" : 44,
+            transition: "height 0.25s ease",
+            display: "flex", flexDirection: "column", overflow: "hidden",
+          }}>
+            {/* Handle bar */}
+            <div
+              onClick={() => setDrawerOpen((o) => !o)}
+              style={{ height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", cursor: "pointer", touchAction: "manipulation" }}
+            >
+              <span style={{ fontSize: 12, color: T.textMuted, fontFamily: FONT, userSelect: "none", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Products {drawerOpen ? "▼" : "▲"}
+              </span>
+              <button style={{ ...S.bp, fontSize: 10, padding: "3px 10px" }} onClick={(e) => { e.stopPropagation(); setShowProductForm("new"); }}>+ New</button>
+            </div>
+            {/* Drawer content — always mounted so source elements stay in the DOM during drag */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "0 10px 10px", display: "flex", flexDirection: "column", gap: 6, visibility: drawerOpen ? "visible" : "hidden", pointerEvents: drawerOpen ? "auto" : "none" }}>
+              <ProductPool {...poolProps} />
+            </div>
+          </div>
+        </>
+      )}
 
       {showProductForm && <ProductFormModal product={showProductForm === "new" ? null : showProductForm} onSave={handleProductSave} onClose={() => setShowProductForm(null)} />}
       {showAutoGen && <AutoGenModal products={products} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}

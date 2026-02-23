@@ -2,9 +2,14 @@ import { useState, useMemo } from "react";
 import { T, S, FONT, PRODUCT_COLORS, COOK_TYPES, FISH_TYPES, PRODUCT_LABELS } from "../utils/constants.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 
-export default function ProductPool({ products, filters, setFilters, onEdit, onDelete }) {
+const SORT_LABEL = { name: "Name", demand: "Demand", color: "Color", type: "Type" };
+
+export default function ProductPool({ products, filters, setFilters, onEdit, onDelete, startTouchDrag, isMobile }) {
   const [search, setSearch] = useState("");
   const [confirmDel, setConfirmDel] = useState(null);
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+  const [showSortPanel, setShowSortPanel] = useState(false);
+  const activeFilterCount = [filters.color, filters.cookType, filters.fishType, filters.deepShallow].filter(Boolean).length;
 
   const filtered = useMemo(() => {
     let l = [...products];
@@ -26,37 +31,72 @@ export default function ProductPool({ products, filters, setFilters, onEdit, onD
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0 }}>
       <input style={S.inp} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name / PLU..." />
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        <select style={S.sel} value={filters.color || ""} onChange={(e) => setFilters((f) => ({ ...f, color: e.target.value || "" }))}>
-          <option value="">All Colors</option>
-          {Object.entries(PRODUCT_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <select style={S.sel} value={filters.cookType || ""} onChange={(e) => setFilters((f) => ({ ...f, cookType: e.target.value || "" }))}>
-          <option value="">All Cook</option>
-          {COOK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-        <select style={S.sel} value={filters.fishType || ""} onChange={(e) => setFilters((f) => ({ ...f, fishType: e.target.value || "" }))}>
-          <option value="">All Type</option>
-          {FISH_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
+      {/* Filter / Sort toggle buttons */}
       <div style={{ display: "flex", gap: 4 }}>
-        <select style={S.sel} value={filters.deepShallow || ""} onChange={(e) => setFilters((f) => ({ ...f, deepShallow: e.target.value || "" }))}>
-          <option value="">All Depth</option>
-          <option value="shallow">Shallow</option>
-          <option value="deep">Deep</option>
-        </select>
-        <select style={S.sel} value={filters.sort || "name"} onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value }))}>
-          <option value="name">Sort: Name</option>
-          <option value="demand">Sort: Demand</option>
-          <option value="color">Sort: Color</option>
-          <option value="type">Sort: Type</option>
-        </select>
+        <button
+          type="button"
+          onClick={() => { setShowFiltersPanel((v) => !v); setShowSortPanel(false); }}
+          style={{ ...S.sel, cursor: "pointer", background: activeFilterCount > 0 ? T.accentDim + "55" : T.surfaceAlt, color: activeFilterCount > 0 ? T.accent : T.textMuted, border: `1px solid ${activeFilterCount > 0 ? T.accent + "44" : T.border}`, textAlign: "center" }}
+        >
+          {activeFilterCount > 0 ? `Filters (${activeFilterCount})` : "Filters"} {showFiltersPanel ? "▲" : "▼"}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setShowSortPanel((v) => !v); setShowFiltersPanel(false); }}
+          style={{ ...S.sel, cursor: "pointer", textAlign: "center" }}
+        >
+          Sort: {SORT_LABEL[filters.sort || "name"]} {showSortPanel ? "▲" : "▼"}
+        </button>
       </div>
+      {showFiltersPanel && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ display: "flex", gap: 3 }}>
+            <select style={S.sel} value={filters.color || ""} onChange={(e) => setFilters((f) => ({ ...f, color: e.target.value || "" }))}>
+              <option value="">All Colors</option>
+              {Object.entries(PRODUCT_COLORS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <select style={S.sel} value={filters.fishType || ""} onChange={(e) => setFilters((f) => ({ ...f, fishType: e.target.value || "" }))}>
+              <option value="">All Type</option>
+              {FISH_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div style={{ display: "flex", gap: 3 }}>
+            <select style={S.sel} value={filters.cookType || ""} onChange={(e) => setFilters((f) => ({ ...f, cookType: e.target.value || "" }))}>
+              <option value="">All Cook</option>
+              {COOK_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select style={S.sel} value={filters.deepShallow || ""} onChange={(e) => setFilters((f) => ({ ...f, deepShallow: e.target.value || "" }))}>
+              <option value="">All Depth</option>
+              <option value="shallow">Shallow</option>
+              <option value="deep">Deep</option>
+            </select>
+          </div>
+        </div>
+      )}
+      {showSortPanel && (
+        <div style={{ display: "flex", gap: 3 }}>
+          {[["name", "Name"], ["demand", "Demand"], ["color", "Color"], ["type", "Type"]].map(([k, l]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => { setFilters((f) => ({ ...f, sort: k })); setShowSortPanel(false); }}
+              style={{
+                flex: 1, padding: "4px 2px", borderRadius: 4, fontSize: 10, fontFamily: FONT, cursor: "pointer",
+                border: `1px solid ${(filters.sort || "name") === k ? T.accent + "66" : T.border}`,
+                background: (filters.sort || "name") === k ? T.accent + "22" : T.surfaceAlt,
+                color: (filters.sort || "name") === k ? T.accent : T.text,
+                fontWeight: (filters.sort || "name") === k ? 700 : 400,
+              }}
+            >{l}</button>
+          ))}
+        </div>
+      )}
       <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
         {filtered.map((p) => (
-          <div key={p.id} draggable onDragStart={(e) => { e.dataTransfer.setData("productId", p.id); e.dataTransfer.setData("dragType", "product"); }}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 5, background: T.surfaceAlt, border: `1px solid ${T.border}`, cursor: "grab", userSelect: "none" }}>
+          <div key={p.id} draggable
+            onDragStart={(e) => { e.dataTransfer.setData("productId", p.id); e.dataTransfer.setData("dragType", "product"); }}
+            onTouchStart={(e) => startTouchDrag(e, { type: "product", productId: p.id }, e.currentTarget)}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: isMobile ? "10px 8px" : "5px 8px", borderRadius: 5, background: T.surfaceAlt, border: `1px solid ${T.border}`, cursor: "grab", userSelect: "none", minHeight: isMobile ? 44 : undefined, touchAction: "none" }}>
             <span style={{ width: 10, height: 10, borderRadius: 2, background: PRODUCT_COLORS[p.color]?.bg, flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 12, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>

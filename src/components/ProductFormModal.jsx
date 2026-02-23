@@ -14,7 +14,7 @@ export default function ProductFormModal({ product, onSave, onClose }) {
 
   return (
     <div style={S.ov} onClick={onClose}>
-      <div style={S.mod} onClick={(e) => e.stopPropagation()}>
+      <div style={{ ...S.mod, maxHeight: "90dvh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
         <h3 style={{ margin: 0, fontFamily: DFONT, fontSize: 18, color: T.text }}>
           {product ? "Edit Product" : "Add Product"}
         </h3>

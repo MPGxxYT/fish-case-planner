@@ -9,7 +9,5 @@ export const DEFAULT_PRODUCTS = [
   { id: "p8", name: "Orange Roughy", plu: "99254", color: "cool", cookType: "Raw", fishType: "Finfish", maxPan: 6, minPan: 3, deepShallow: "shallow", demand: 4, preferredPosition: "" },
   { id: "p9", name: "Chilean Seabass", plu: "92012", color: "cool", cookType: "Raw", fishType: "Finfish", maxPan: 6, minPan: 3, deepShallow: "shallow", demand: 5, preferredPosition: "Far right, next to swordfish/tuna" },
   { id: "p10", name: "Whitefish", plu: "92110", color: "cool", cookType: "Raw", fishType: "Finfish", maxPan: 6, minPan: 3, deepShallow: "shallow", demand: 3, preferredPosition: "" },
-  { id: "p11", name: "26/30 Shrimp", plu: "92023", color: "warm", cookType: "Raw", fishType: "Shellfish", maxPan: 6, minPan: 3, deepShallow: "deep", demand: 7, preferredPosition: "" },
-  { id: "p12", name: "Dover Sole", plu: "99249", color: "cool", cookType: "Raw", fishType: "Finfish", maxPan: 6, minPan: 3, deepShallow: "shallow", demand: 4, preferredPosition: "" },
-  { id: "p12", name: "Dover Sole", plu: "99249", color: "cool", cookType: "Raw", fishType: "Finfish", maxPan: 6, minPan: 3, deepShallow: "shallow", demand: 4, preferredPosition: "" },
+  { id: "p11", name: "Dover Sole", plu: "99249", color: "cool", cookType: "Raw", fishType: "Finfish", maxPan: 6, minPan: 3, deepShallow: "shallow", demand: 4, preferredPosition: "" },
 ];

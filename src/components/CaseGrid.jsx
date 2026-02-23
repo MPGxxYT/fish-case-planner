@@ -6,6 +6,8 @@ function InsertZone({ idx, hoverInsertIdx, setHoverInsertIdx, panDragId, onCreat
   const isHovered = hoverInsertIdx === idx;
   return (
     <div
+      data-drop-type="insert"
+      data-insert-idx={idx}
       onDragOver={(e) => {
         const dt = e.dataTransfer.types;
         if (panDragId) return;
@@ -56,7 +58,7 @@ function getPanSummary(pans) {
   return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId }) {
+export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, startTouchDrag }) {
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
   const [hoverInsertIdx, setHoverInsertIdx] = useState(null);
@@ -71,7 +73,9 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
 
   const usedWidth = pans.reduce((s, p) => s + p.width, 0);
   const remainingWidth = caseWidth - usedWidth;
-  const unitSize = Math.max(3, (containerWidth - 2) / Math.max(caseWidth, usedWidth));
+  // On mobile, enforce a minimum pixel size per unit so the case scrolls rather than shrinks
+  const minUnit = isMobile ? 8 : 3;
+  const unitSize = Math.max(minUnit, (containerWidth - 2) / Math.max(caseWidth, usedWidth));
   const summary = useMemo(() => getPanSummary(pans), [pans]);
 
   return (
@@ -86,15 +90,18 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
         <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
           <div
             ref={caseRef}
+            className="case-container"
             style={{
               display: "flex", border: `2px solid ${T.borderLight}`, borderRadius: 6,
-              height: 300, background: T.surface, overflow: "hidden", position: "relative",
+              height: isMobile ? "calc(100svh - 194px)" : 300, background: T.surface,
+              overflowX: "auto", overflowY: "hidden", position: "relative",
             }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => { setHoverInsertIdx(null); setInsertTarget(null); setPanDragId(null); }}
           >
             {pans.length === 0 ? (
               <div
+                data-drop-type="empty-case"
                 style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}
                 onDragOver={(e) => {
                   const dt = e.dataTransfer.types;
@@ -133,6 +140,7 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
                       insertIndicator={insertTarget?.panId === pan.id ? insertTarget.side : null}
                       onPanDragStart={onPanDragStart} onPanDragOver={onPanDragOver}
                       onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
+                      startTouchDrag={startTouchDrag} isMobile={isMobile}
                     />
                     {/* Insert zone after each pan */}
                     <InsertZone idx={i + 1} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} />
@@ -140,6 +148,8 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
                 ))}
                 {remainingWidth > 0 && (
                   <div
+                    data-drop-type="insert"
+                    data-insert-idx={pans.length}
                     style={{ flex: `0 0 ${remainingWidth * unitSize}px`, minWidth: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", borderLeft: `1px dashed ${T.borderLight}` }}
                     onDragOver={(e) => {
                       const dt = e.dataTransfer.types;

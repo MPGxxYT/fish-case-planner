@@ -31,3 +31,18 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
+/* ─── Touch / Mobile ─────────────────────────────────── */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.case-container {
+  touch-action: pan-x;
+}
+
+body.touch-dragging {
+  overflow: hidden;
+  touch-action: none;
+}
