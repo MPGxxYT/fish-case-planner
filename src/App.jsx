@@ -38,6 +38,9 @@ export default function App() {
   const [clearSlotConfirm, setClearSlotConfirm] = useState(null);
   const [confirmExpand, setConfirmExpand] = useState(null);
 
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) : null;
+
   const { isMobile, isPortrait } = useIsMobile();
   const [portraitDismissed, setPortraitDismissed] = useState(false);
   const { panDragId, insertTarget, insertTargetRef, setInsertTarget, setPanDragId, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd } = useCaseDrag(setPans);
@@ -150,9 +153,19 @@ export default function App() {
   const loadCase = (c) => { setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); };
   const deleteCase = (idx) => setSavedCases((sc) => sc.filter((_, i) => i !== idx));
 
+  const handleSelectProduct = (id) => {
+    if (selectedProductId === id) { setSelectedProductId(null); return; }
+    setSelectedProductId(id);
+    setDrawerOpen(false);
+  };
+  const handleMobilePlaceProduct = (panId, slotIdx) => {
+    assignProduct(panId, slotIdx, selectedProductId);
+    setSelectedProductId(null);
+  };
+
   // Close drawer immediately at touchstart — safe because ProductPool stays mounted (CSS-only hide)
   const poolStartTouchDrag = (e, dragInfo, sourceEl) => { setDrawerOpen(false); startTouchDrag(e, dragInfo, sourceEl); };
-  const poolProps = { products, filters, setFilters, onEdit: (p) => setShowProductForm(p), onDelete: deleteProduct, startTouchDrag: poolStartTouchDrag, isMobile };
+  const poolProps = { products, filters, setFilters, onEdit: (p) => setShowProductForm(p), onDelete: deleteProduct, startTouchDrag: poolStartTouchDrag, isMobile, selectedProductId, onSelectProduct: handleSelectProduct };
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: DFONT }}>
@@ -218,7 +231,8 @@ export default function App() {
             insertTarget={insertTarget} onPanDragStart={onPanDragStart}
             onPanDragOver={onPanDragOver} onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
             setInsertTarget={setInsertTarget} setPanDragId={setPanDragId} panDragId={panDragId}
-            isMobile={isMobile} startTouchDrag={startTouchDrag}
+            isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
+            selectedProductId={selectedProductId} onMobilePlaceProduct={handleMobilePlaceProduct}
           />
 
           {colorWarnings.length > 0 && (
@@ -235,11 +249,27 @@ export default function App() {
           {drawerOpen && (
             <div onClick={() => setDrawerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }} />
           )}
+          {/* Selected product banner — shown above the drawer when a product is selected */}
+          {selectedProduct && !drawerOpen && (
+            <div style={{
+              position: "fixed", bottom: 44, left: 0, right: 0, zIndex: 299,
+              background: T.accent, padding: "8px 14px",
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: T.bg, fontFamily: DFONT }}>
+                {selectedProduct.name} — tap a slot to place
+              </span>
+              <button
+                onClick={() => setSelectedProductId(null)}
+                style={{ background: "none", border: "none", color: T.bg, fontSize: 18, cursor: "pointer", padding: "0 2px", lineHeight: 1, opacity: 0.8 }}
+              >×</button>
+            </div>
+          )}
           <div style={{
             position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 300,
             background: T.surface, borderTop: `1px solid ${T.borderLight}`,
             borderRadius: "12px 12px 0 0",
-            height: drawerOpen ? "52vh" : 44,
+            height: drawerOpen ? "58vh" : 44,
             transition: "height 0.25s ease",
             display: "flex", flexDirection: "column", overflow: "hidden",
           }}>
@@ -248,8 +278,8 @@ export default function App() {
               onClick={() => setDrawerOpen((o) => !o)}
               style={{ height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", cursor: "pointer", touchAction: "manipulation" }}
             >
-              <span style={{ fontSize: 12, color: T.textMuted, fontFamily: FONT, userSelect: "none", textTransform: "uppercase", letterSpacing: 0.5 }}>
-                Products {drawerOpen ? "▼" : "▲"}
+              <span style={{ fontSize: 12, color: selectedProductId ? T.accent : T.textMuted, fontFamily: FONT, userSelect: "none", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: selectedProductId ? 700 : 400 }}>
+                {selectedProductId ? `${selectedProduct?.name} selected ▲` : `Products ${drawerOpen ? "▼" : "▲"}`}
               </span>
               <button style={{ ...S.bp, fontSize: 10, padding: "3px 10px" }} onClick={(e) => { e.stopPropagation(); setShowProductForm("new"); }}>+ New</button>
             </div>

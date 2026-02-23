@@ -4,7 +4,7 @@ import ConfirmDialog from "./ConfirmDialog.jsx";
 
 const SORT_LABEL = { name: "Name", demand: "Demand", color: "Color", type: "Type" };
 
-export default function ProductPool({ products, filters, setFilters, onEdit, onDelete, startTouchDrag, isMobile }) {
+export default function ProductPool({ products, filters, setFilters, onEdit, onDelete, startTouchDrag, isMobile, selectedProductId, onSelectProduct }) {
   const [search, setSearch] = useState("");
   const [confirmDel, setConfirmDel] = useState(null);
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
@@ -91,39 +91,138 @@ export default function ProductPool({ products, filters, setFilters, onEdit, onD
           ))}
         </div>
       )}
-      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
-        {filtered.map((p) => (
-          <div key={p.id} draggable
-            onDragStart={(e) => { e.dataTransfer.setData("productId", p.id); e.dataTransfer.setData("dragType", "product"); }}
-            onTouchStart={(e) => startTouchDrag(e, { type: "product", productId: p.id }, e.currentTarget)}
-            style={{ display: "flex", alignItems: "center", gap: 6, padding: isMobile ? "10px 8px" : "5px 8px", borderRadius: 5, background: T.surfaceAlt, border: `1px solid ${T.border}`, cursor: "grab", userSelect: "none", minHeight: isMobile ? 44 : undefined, touchAction: "none" }}>
-            <span style={{ width: 10, height: 10, borderRadius: 2, background: PRODUCT_COLORS[p.color]?.bg, flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-              <div style={{ fontSize: 9, color: T.textDim, fontFamily: FONT }}>
-                {p.plu || "—"} · {p.fishType} · {p.cookType} · D:<span style={{ color: p.demand >= 7 ? T.success : p.demand >= 4 ? T.warning : T.danger }}>{p.demand}</span>
-              </div>
-              {p.preferredPosition && <div style={{ fontSize: 8, color: T.accent, fontFamily: FONT, opacity: 0.7 }}>📍 {p.preferredPosition}</div>}
-              {(p.labels || []).length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 2, marginTop: 2 }}>
-                  {(p.labels || []).map((key) => {
-                    const lbl = PRODUCT_LABELS.find((l) => l.key === key);
-                    if (!lbl) return null;
-                    return (
-                      <span key={key} style={{ fontSize: 8, padding: "1px 4px", borderRadius: 3, fontFamily: FONT, background: lbl.color + "22", color: lbl.color, fontWeight: 600 }}>
-                        {lbl.abbr}
-                      </span>
-                    );
-                  })}
+
+      {/* Mobile hint */}
+      {isMobile && (
+        <div style={{ fontSize: 10, color: T.textDim, fontFamily: FONT, textAlign: "center", lineHeight: 1.4 }}>
+          Tap card to select · drag ⠿ to insert new pan
+        </div>
+      )}
+
+      <div style={{
+        flex: 1,
+        overflowY: "auto",
+        display: isMobile ? "grid" : "flex",
+        gridTemplateColumns: isMobile ? "1fr 1fr 1fr 1fr" : undefined,
+        flexDirection: isMobile ? undefined : "column",
+        gap: isMobile ? 4 : 2,
+        alignContent: "start",
+      }}>
+        {filtered.map((p) => {
+          const isSelected = selectedProductId === p.id;
+          const color = PRODUCT_COLORS[p.color];
+
+          if (isMobile) {
+            // Compact 3-column card for mobile
+            return (
+              <div
+                key={p.id}
+                data-pool-item
+                draggable
+                onDragStart={(e) => { e.dataTransfer.setData("productId", p.id); e.dataTransfer.setData("dragType", "product"); }}
+                onClick={() => onSelectProduct?.(p.id)}
+                style={{
+                  display: "flex", flexDirection: "column", gap: 3,
+                  padding: "6px 5px",
+                  borderRadius: 6,
+                  background: isSelected ? T.accent + "22" : T.surfaceAlt,
+                  border: `1.5px solid ${isSelected ? T.accent : T.border}`,
+                  cursor: "pointer",
+                  userSelect: "none",
+                  position: "relative",
+                  minHeight: 64,
+                }}
+              >
+                {/* Color bar on left */}
+                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderRadius: "6px 0 0 6px", background: color?.bg ?? "#888" }} />
+                {/* Top row: name */}
+                <div style={{ paddingLeft: 6, paddingRight: 6 }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, color: isSelected ? T.accent : T.text,
+                    lineHeight: 1.25, wordBreak: "break-word",
+                  }}>
+                    {p.name}
+                  </div>
                 </div>
-              )}
+                {/* Bottom row: edit + demand + deep/shallow + grip handle */}
+                <div style={{ display: "flex", alignItems: "center", gap: 3, paddingLeft: 2 }}>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                    style={{
+                      background: "none", border: "none", color: T.accent,
+                      fontSize: 13, cursor: "pointer", lineHeight: 1, opacity: 0.7,
+                      width: 22, height: 22, flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      padding: 0,
+                    }}
+                    title="Edit product"
+                  >✎</button>
+                  <span style={{
+                    fontSize: 9, fontFamily: FONT, fontWeight: 700,
+                    color: p.demand >= 7 ? T.success : p.demand >= 4 ? T.warning : T.danger,
+                  }}>D:{p.demand}</span>
+                  <span style={{
+                    fontSize: 8, padding: "1px 3px", borderRadius: 2, fontFamily: FONT, textTransform: "uppercase",
+                    background: p.deepShallow === "deep" ? "#3b82f622" : "#f59e0b22",
+                    color: p.deepShallow === "deep" ? "#60a5fa" : "#fbbf24",
+                  }}>{p.deepShallow === "deep" ? "D" : "S"}</span>
+                  <div style={{ flex: 1 }} />
+                  {/* Grip handle — touchAction none here only, so scrolling works on the rest of the card */}
+                  <span
+                    onTouchStart={(e) => { e.stopPropagation(); startTouchDrag(e, { type: "product", productId: p.id }, e.currentTarget.closest("[data-pool-item]")); }}
+                    style={{ fontSize: 13, color: T.textDim, cursor: "grab", padding: "2px 3px", touchAction: "none", lineHeight: 1 }}
+                    title="Drag to insert new pan"
+                  >⠿</span>
+                </div>
+                {/* Selected checkmark */}
+                {isSelected && (
+                  <div style={{ position: "absolute", bottom: 3, right: 3, width: 14, height: 14, borderRadius: "50%", background: T.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 9, color: T.bg, fontWeight: 900, lineHeight: 1 }}>✓</span>
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          // Desktop: full-detail single-column card (unchanged)
+          return (
+            <div key={p.id} data-pool-item draggable
+              onDragStart={(e) => { e.dataTransfer.setData("productId", p.id); e.dataTransfer.setData("dragType", "product"); }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 5, background: T.surfaceAlt, border: `1px solid ${T.border}`, cursor: "grab", userSelect: "none" }}>
+              {/* Grip handle for desktop drag (touch) */}
+              <span
+                onTouchStart={(e) => { e.stopPropagation(); startTouchDrag(e, { type: "product", productId: p.id }, e.currentTarget.parentElement); }}
+                style={{ fontSize: 14, color: T.textDim, cursor: "grab", padding: "0 2px", touchAction: "none", flexShrink: 0 }}
+                title="Drag to insert new pan"
+              >⠿</span>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: PRODUCT_COLORS[p.color]?.bg, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
+                <div style={{ fontSize: 9, color: T.textDim, fontFamily: FONT }}>
+                  {p.plu || "—"} · {p.fishType} · {p.cookType} · D:<span style={{ color: p.demand >= 7 ? T.success : p.demand >= 4 ? T.warning : T.danger }}>{p.demand}</span>
+                </div>
+                {p.preferredPosition && <div style={{ fontSize: 8, color: T.accent, fontFamily: FONT, opacity: 0.7 }}>📍 {p.preferredPosition}</div>}
+                {(p.labels || []).length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 2, marginTop: 2 }}>
+                    {(p.labels || []).map((key) => {
+                      const lbl = PRODUCT_LABELS.find((l) => l.key === key);
+                      if (!lbl) return null;
+                      return (
+                        <span key={key} style={{ fontSize: 8, padding: "1px 4px", borderRadius: 3, fontFamily: FONT, background: lbl.color + "22", color: lbl.color, fontWeight: 600 }}>
+                          {lbl.abbr}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <span style={{ fontSize: 7, padding: "1px 4px", borderRadius: 3, fontFamily: FONT, textTransform: "uppercase", background: p.deepShallow === "deep" ? "#3b82f622" : "#f59e0b22", color: p.deepShallow === "deep" ? "#60a5fa" : "#fbbf24" }}>{p.deepShallow}</span>
+              <button style={{ ...S.tb, color: T.accent }} onClick={(e) => { e.stopPropagation(); onEdit(p); }}>✎</button>
+              <button style={{ ...S.tb, color: T.danger }} onClick={(e) => { e.stopPropagation(); setConfirmDel(p); }}>×</button>
             </div>
-            <span style={{ fontSize: 7, padding: "1px 4px", borderRadius: 3, fontFamily: FONT, textTransform: "uppercase", background: p.deepShallow === "deep" ? "#3b82f622" : "#f59e0b22", color: p.deepShallow === "deep" ? "#60a5fa" : "#fbbf24" }}>{p.deepShallow}</span>
-            <button style={{ ...S.tb, color: T.accent }} onClick={(e) => { e.stopPropagation(); onEdit(p); }}>✎</button>
-            <button style={{ ...S.tb, color: T.danger }} onClick={(e) => { e.stopPropagation(); setConfirmDel(p); }}>×</button>
-          </div>
-        ))}
-        {filtered.length === 0 && <div style={{ color: T.textDim, fontSize: 12, padding: 8, textAlign: "center" }}>No products match</div>}
+          );
+        })}
+        {filtered.length === 0 && <div style={{ color: T.textDim, fontSize: 12, padding: 8, textAlign: "center", gridColumn: "1/-1" }}>No products match</div>}
       </div>
       {confirmDel && (
         <ConfirmDialog

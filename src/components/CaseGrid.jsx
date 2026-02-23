@@ -58,7 +58,7 @@ function getPanSummary(pans) {
   return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, startTouchDrag }) {
+export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, isPortrait, startTouchDrag, selectedProductId, onMobilePlaceProduct }) {
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
   const [hoverInsertIdx, setHoverInsertIdx] = useState(null);
@@ -93,7 +93,7 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
             className="case-container"
             style={{
               display: "flex", border: `2px solid ${T.borderLight}`, borderRadius: 6,
-              height: isMobile ? "calc(100svh - 194px)" : 300, background: T.surface,
+              height: isMobile ? (isPortrait ? 340 : "calc(100svh - 194px)") : 300, background: T.surface,
               overflowX: "auto", overflowY: "hidden", position: "relative",
             }}
             onDragOver={(e) => e.preventDefault()}
@@ -141,6 +141,7 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
                       onPanDragStart={onPanDragStart} onPanDragOver={onPanDragOver}
                       onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
                       startTouchDrag={startTouchDrag} isMobile={isMobile}
+                      selectedProductId={selectedProductId} onMobilePlaceProduct={onMobilePlaceProduct}
                     />
                     {/* Insert zone after each pan */}
                     <InsertZone idx={i + 1} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} />
