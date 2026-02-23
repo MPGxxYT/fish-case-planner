@@ -37,6 +37,9 @@ export default function App() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearSlotConfirm, setClearSlotConfirm] = useState(null);
   const [confirmExpand, setConfirmExpand] = useState(null);
+  const [pansHistory, setPansHistory] = useState([]);
+  const [pansRedo, setPansRedo] = useState([]);
+  const [confirmRemovePan, setConfirmRemovePan] = useState(null);
 
   const [selectedProductId, setSelectedProductId] = useState(null);
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) : null;
@@ -49,48 +52,75 @@ export default function App() {
   const remainingWidth = caseWidth - usedWidth;
   const colorWarnings = useMemo(() => checkColorConflicts(pans, products), [pans, products]);
 
+  const MAX_HISTORY = 20;
+  const snapshotPans = () => {
+    setPansHistory((h) => [...h.slice(-(MAX_HISTORY - 1)), pans]);
+    setPansRedo([]);
+  };
+  const handleUndo = () => {
+    if (pansHistory.length === 0) return;
+    setPansRedo((r) => [...r, pans]);
+    setPans(pansHistory[pansHistory.length - 1]);
+    setPansHistory((h) => h.slice(0, -1));
+  };
+  const handleRedo = () => {
+    if (pansRedo.length === 0) return;
+    setPansHistory((h) => [...h.slice(-(MAX_HISTORY - 1)), pans]);
+    setPans(pansRedo[pansRedo.length - 1]);
+    setPansRedo((r) => r.slice(0, -1));
+  };
+
   const addPan = (w, d, pt) => {
     if (w > remainingWidth) return;
+    snapshotPans();
     const sc = d === "half" ? 2 : d === "third" ? 3 : 1;
     const slots = {};
     for (let i = 0; i < sc; i++) slots[i] = null;
     setPans((p) => [...p, { id: uid(), width: w, depth: d, panType: pt, slots }]);
   };
-  const removePan = (id) => setPans((p) => p.filter((x) => x.id !== id));
+  const removePan = (id) => { snapshotPans(); setPans((p) => p.filter((x) => x.id !== id)); };
+  const handleRemovePanClick = (id) => setConfirmRemovePan(id);
+  const confirmRemovePanAction = () => { removePan(confirmRemovePan); setConfirmRemovePan(null); };
   const setPanType = (id, t) => setPans((p) => p.map((pan) => (pan.id === id ? { ...pan, panType: t } : pan)));
   const setSlotType = (panId, slotIdx, type) => setPans((p) => p.map((pan) => {
     if (pan.id !== panId) return pan;
     return { ...pan, slotTypes: { ...pan.slotTypes, [slotIdx]: type } };
   }));
-  const setPanWidth = (panId, newWidth) => setPans((p) => p.map((pan) => {
-    if (pan.id !== panId) return pan;
-    const updated = { ...pan, width: newWidth };
-    if (!canSplitDepth(newWidth) && pan.depth !== "full") {
-      updated.depth = "full";
-      updated.slots = { 0: pan.slots[0] || null };
-      updated.slotTypes = undefined;
-    }
-    return updated;
-  }));
-  const setPanDepth = (panId, newDepth) => setPans((p) => p.map((pan) => {
-    if (pan.id !== panId) return pan;
-    const oldSlotCount = pan.depth === "half" ? 2 : pan.depth === "third" ? 3 : 1;
-    const newSlotCount = newDepth === "half" ? 2 : newDepth === "third" ? 3 : 1;
-    const updated = { ...pan, depth: newDepth };
-    if (newSlotCount !== oldSlotCount) {
-      const newSlots = {};
-      for (let i = 0; i < newSlotCount; i++) newSlots[i] = pan.slots[i] || null;
-      updated.slots = newSlots;
-      if (pan.slotTypes) {
-        const newSlotTypes = {};
-        for (let i = 0; i < newSlotCount; i++) {
-          if (pan.slotTypes[i] !== undefined) newSlotTypes[i] = pan.slotTypes[i];
-        }
-        updated.slotTypes = Object.keys(newSlotTypes).length > 0 ? newSlotTypes : undefined;
+  const setPanWidth = (panId, newWidth) => {
+    snapshotPans();
+    setPans((p) => p.map((pan) => {
+      if (pan.id !== panId) return pan;
+      const updated = { ...pan, width: newWidth };
+      if (!canSplitDepth(newWidth) && pan.depth !== "full") {
+        updated.depth = "full";
+        updated.slots = { 0: pan.slots[0] || null };
+        updated.slotTypes = undefined;
       }
-    }
-    return updated;
-  }));
+      return updated;
+    }));
+  };
+  const setPanDepth = (panId, newDepth) => {
+    snapshotPans();
+    setPans((p) => p.map((pan) => {
+      if (pan.id !== panId) return pan;
+      const oldSlotCount = pan.depth === "half" ? 2 : pan.depth === "third" ? 3 : 1;
+      const newSlotCount = newDepth === "half" ? 2 : newDepth === "third" ? 3 : 1;
+      const updated = { ...pan, depth: newDepth };
+      if (newSlotCount !== oldSlotCount) {
+        const newSlots = {};
+        for (let i = 0; i < newSlotCount; i++) newSlots[i] = pan.slots[i] || null;
+        updated.slots = newSlots;
+        if (pan.slotTypes) {
+          const newSlotTypes = {};
+          for (let i = 0; i < newSlotCount; i++) {
+            if (pan.slotTypes[i] !== undefined) newSlotTypes[i] = pan.slotTypes[i];
+          }
+          updated.slotTypes = Object.keys(newSlotTypes).length > 0 ? newSlotTypes : undefined;
+        }
+      }
+      return updated;
+    }));
+  };
   const createPanFromProduct = (productId, insertIdx) => {
     const prod = products.find((p) => p.id === productId);
     if (!prod) return;
@@ -99,6 +129,7 @@ export default function App() {
       return;
     }
     const newPan = { id: uid(), width: prod.minPan, depth: "full", panType: prod.deepShallow, slots: { 0: productId } };
+    snapshotPans();
     setPans((p) => { const a = [...p]; a.splice(insertIdx, 0, newPan); return a; });
   };
   const confirmExpandAction = () => {
@@ -106,6 +137,7 @@ export default function App() {
     const { productId, insertIdx, product } = confirmExpand;
     const newPan = { id: uid(), width: product.minPan, depth: "full", panType: product.deepShallow, slots: { 0: productId } };
     const currentUsed = pans.reduce((s, p) => s + p.width, 0);
+    snapshotPans();
     setCaseWidth(currentUsed + product.minPan);
     setPans((p) => { const a = [...p]; a.splice(insertIdx, 0, newPan); return a; });
     setConfirmExpand(null);
@@ -115,6 +147,7 @@ export default function App() {
   const clearSlot = (panId, slotIdx) => setClearSlotConfirm({ panId, slotIdx });
   const confirmClearSlotAction = () => {
     if (!clearSlotConfirm) return;
+    snapshotPans();
     directClearSlot(clearSlotConfirm.panId, clearSlotConfirm.slotIdx);
     setClearSlotConfirm(null);
   };
@@ -143,14 +176,14 @@ export default function App() {
       return { ...pan, slots: ns };
     }));
   };
-  const handleGenerate = (items, w) => { setCaseWidth(w); setPans(autoGenerateCase(items, w)); setShowAutoGen(false); };
+  const handleGenerate = (items, w) => { snapshotPans(); setCaseWidth(w); setPans(autoGenerateCase(items, w)); setShowAutoGen(false); };
   const saveCase = () => {
     if (!saveName.trim()) return;
     setSavedCases((sc) => [...sc, { name: saveName.trim(), pans: JSON.parse(JSON.stringify(pans)), caseWidth, savedAt: new Date().toISOString() }]);
     setSaveName("");
     setShowSaveInput(false);
   };
-  const loadCase = (c) => { setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); };
+  const loadCase = (c) => { snapshotPans(); setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); };
   const deleteCase = (idx) => setSavedCases((sc) => sc.filter((_, i) => i !== idx));
 
   const handleSelectProduct = (id) => {
@@ -219,6 +252,8 @@ export default function App() {
               <button style={S.ch} onClick={() => setShowSaveInput(true)}>💾 Save</button>
             )}
             <button style={{ ...S.ch, color: T.danger }} onClick={() => setConfirmClear(true)}>🗑 Clear</button>
+            <button style={{ ...S.ch, opacity: pansHistory.length === 0 ? 0.35 : 1 }} disabled={pansHistory.length === 0} onClick={handleUndo}>↩ Undo</button>
+            <button style={{ ...S.ch, opacity: pansRedo.length === 0 ? 0.35 : 1 }} disabled={pansRedo.length === 0} onClick={handleRedo}>↪ Redo</button>
           </div>
 
           <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} />
@@ -226,7 +261,7 @@ export default function App() {
           <CaseGrid
             pans={pans} products={products} caseWidth={caseWidth}
             onAssignProduct={assignProduct} onClearSlot={clearSlot} onDirectClearSlot={directClearSlot}
-            onRemovePan={removePan} onSetPanType={setPanType} onSetSlotType={setSlotType}
+            onRemovePan={handleRemovePanClick} onSetPanType={setPanType} onSetSlotType={setSlotType}
             onSetPanWidth={setPanWidth} onSetPanDepth={setPanDepth} onCreatePanFromProduct={createPanFromProduct}
             insertTarget={insertTarget} onPanDragStart={onPanDragStart}
             onPanDragOver={onPanDragOver} onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
@@ -295,7 +330,8 @@ export default function App() {
       {showAutoGen && <AutoGenModal products={products} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
       {showSaved && <SavedCasesModal savedCases={savedCases} onLoad={loadCase} onDelete={deleteCase} onClose={() => setShowSaved(false)} />}
-      {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { setPans([]); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
+      {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { snapshotPans(); setPans([]); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
+      {confirmRemovePan && <ConfirmDialog message="Remove this pan? Any products in its slots will be unassigned." onConfirm={confirmRemovePanAction} onCancel={() => setConfirmRemovePan(null)} confirmLabel="Remove" />}
       {clearSlotConfirm && <ConfirmDialog message="Remove product from this slot? Consider editing instead if this was a mistake." onConfirm={confirmClearSlotAction} onCancel={() => setClearSlotConfirm(null)} confirmLabel="Remove" />}
       {confirmExpand && <ConfirmDialog message={`No room for ${confirmExpand.product.name} — needs ${confirmExpand.product.minPan} units but only ${remainingWidth} left. Add anyway and expand the case to ${pans.reduce((s, p) => s + p.width, 0) + confirmExpand.product.minPan}?`} onConfirm={confirmExpandAction} onCancel={() => setConfirmExpand(null)} confirmLabel="Add & Expand" />}
     </div>
