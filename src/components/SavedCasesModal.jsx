@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { T, S, FONT, DFONT } from "../utils/constants.js";
-import { isSupabaseConfigured, fetchPublicCases, fetchCaseByCode, publishCase } from "../lib/supabase.js";
+import { isSupabaseConfigured, fetchPublicCases, fetchCaseByCode, publishCase, deletePublicCase } from "../lib/supabase.js";
 import CasePreview from "./CasePreview.jsx";
 
 const TAB_STYLE = (active) => ({
@@ -24,6 +24,14 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
   const [publishAuthor, setPublishAuthor] = useState("");
   const [publishResult, setPublishResult] = useState(null); // { idx, shortCode } or { idx, error }
   const [publishing, setPublishing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [search, setSearch] = useState("");
+  const [deleteIdx, setDeleteIdx] = useState(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+
+  const filtered = search.trim()
+    ? savedCases.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : savedCases;
 
   const togglePreview = (i) => setPreviewIdx(previewIdx === i ? null : i);
 
@@ -49,11 +57,21 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
 
   return (
     <>
+      {savedCases.length > 0 && (
+        <input
+          style={{ ...S.inp, fontSize: 12, padding: "5px 8px", marginBottom: 8 }}
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPreviewIdx(null); }}
+          placeholder="Search saved cases..."
+        />
+      )}
       {savedCases.length === 0 ? (
         <p style={{ color: T.textDim, fontSize: 13 }}>No saved cases yet.</p>
+      ) : filtered.length === 0 ? (
+        <p style={{ color: T.textDim, fontSize: 13 }}>No cases match "{search}".</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {savedCases.map((c, i) => (
+          {filtered.map((c, i) => (
             <div key={i}>
               <div
                 style={{
@@ -72,11 +90,32 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
                 </div>
                 <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={(e) => { e.stopPropagation(); onLoad(c); }}>Load</button>
                 {isSupabaseConfigured && (
-                  <button style={S.ch} onClick={(e) => { e.stopPropagation(); setPublishIdx(publishIdx === i ? null : i); setPublishResult(null); }} title="Publish publicly">↑</button>
+                  <button style={S.ch} onClick={(e) => { e.stopPropagation(); setPublishIdx(publishIdx === i ? null : i); setPublishResult(null); }} title="Publish publicly">☁↑</button>
                 )}
                 <button style={S.ch} onClick={(e) => { e.stopPropagation(); onExport(c); }} title="Export to file">↓</button>
-                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); onDelete(i); setPreviewIdx(null); }}>×</button>
+                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteIdx(deleteIdx === i ? null : i); setDeleteConfirmText(""); }}>×</button>
               </div>
+
+              {/* Delete confirmation */}
+              {deleteIdx === i && (
+                <div style={{ padding: "8px 12px", background: T.bg, border: `1px solid ${T.danger}44`, borderTop: "none", borderRadius: previewIdx === i ? 0 : "0 0 6px 6px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: T.danger }}>Type "yes" to delete:</span>
+                  <input
+                    style={{ ...S.inp, width: 60, fontSize: 11, padding: "4px 8px", borderColor: T.danger + "44" }}
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && deleteConfirmText.toLowerCase() === "yes") { onDelete(savedCases.indexOf(c)); setDeleteIdx(null); setDeleteConfirmText(""); setPreviewIdx(null); } }}
+                    placeholder="yes"
+                    autoFocus
+                  />
+                  <button
+                    style={{ ...S.ch, background: deleteConfirmText.toLowerCase() === "yes" ? T.danger : T.danger + "33", color: deleteConfirmText.toLowerCase() === "yes" ? "#fff" : T.danger, opacity: deleteConfirmText.toLowerCase() === "yes" ? 1 : 0.5 }}
+                    onClick={() => { onDelete(savedCases.indexOf(c)); setDeleteIdx(null); setDeleteConfirmText(""); setPreviewIdx(null); }}
+                    disabled={deleteConfirmText.toLowerCase() !== "yes"}
+                  >Delete</button>
+                  <button style={S.ch} onClick={() => { setDeleteIdx(null); setDeleteConfirmText(""); }}>×</button>
+                </div>
+              )}
 
               {/* Publish inline form */}
               {publishIdx === i && (
@@ -103,7 +142,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <span style={{ color: T.success }}>Published!</span>
                       <code style={{ background: T.surfaceAlt, padding: "2px 8px", borderRadius: 4, fontSize: 13, fontWeight: 700, color: T.accent, fontFamily: FONT, letterSpacing: 1 }}>{publishResult.shortCode}</code>
-                      <button style={{ ...S.ch, fontSize: 10 }} onClick={() => { navigator.clipboard.writeText(publishResult.shortCode); }}>Copy</button>
+                      <button style={{ ...S.ch, fontSize: 10, color: copied ? T.success : S.ch.color }} onClick={() => { navigator.clipboard.writeText(publishResult.shortCode); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>{copied ? "Copied!" : "Copy"}</button>
                     </div>
                   ) : (
                     <span style={{ color: T.danger }}>{publishResult.error}</span>
@@ -140,17 +179,34 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
   const [error, setError] = useState(null);
   const [previewIdx, setPreviewIdx] = useState(null);
 
+  // Search
+  const [searchInput, setSearchInput] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
+
   // Import by code
   const [codeInput, setCodeInput] = useState("");
   const [codeLooking, setCodeLooking] = useState(false);
   const [codeResult, setCodeResult] = useState(null); // fetched case or null
   const [codeError, setCodeError] = useState(null);
 
-  const loadPage = useCallback(async (p) => {
+  // Copy feedback
+  const [copiedCode, setCopiedCode] = useState(null);
+  const handleCopyId = (code) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(code);
+    setTimeout(() => setCopiedCode((c) => c === code ? null : c), 1500);
+  };
+
+  // Delete confirmation
+  const [deleteCode, setDeleteCode] = useState(null); // shortCode of case being deleted
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const loadPage = useCallback(async (p, search) => {
     setLoading(true);
     setError(null);
     try {
-      const result = await fetchPublicCases(p);
+      const result = await fetchPublicCases(p, search);
       setCases((prev) => p === 0 ? result.cases : [...prev, ...result.cases]);
       setHasMore(result.hasMore);
       setPage(p);
@@ -161,7 +217,20 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
     }
   }, []);
 
-  useEffect(() => { loadPage(0); }, [loadPage]);
+  useEffect(() => { loadPage(0, ""); }, [loadPage]);
+
+  const handleSearch = () => {
+    setActiveSearch(searchInput);
+    setPreviewIdx(null);
+    loadPage(0, searchInput);
+  };
+
+  const clearSearch = () => {
+    setSearchInput("");
+    setActiveSearch("");
+    setPreviewIdx(null);
+    loadPage(0, "");
+  };
 
   const handleCodeLookup = async () => {
     if (!codeInput.trim()) return;
@@ -175,6 +244,20 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
       setCodeError(err.message);
     } finally {
       setCodeLooking(false);
+    }
+  };
+
+  const handleDeletePublic = async (shortCode) => {
+    setDeleting(true);
+    try {
+      await deletePublicCase(shortCode);
+      setCases((prev) => prev.filter((c) => c.shortCode !== shortCode));
+      setDeleteCode(null);
+      setDeleteConfirmText("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -197,10 +280,20 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
 
   return (
     <>
-      {/* Import by code */}
-      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12 }}>
+      {/* Search + Import by code */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
         <input
-          style={{ ...S.inp, width: 120, fontSize: 12, padding: "5px 8px", letterSpacing: 1, fontFamily: FONT, textTransform: "uppercase" }}
+          style={{ ...S.inp, flex: 1, minWidth: 140, fontSize: 12, padding: "5px 8px" }}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search by name or author..."
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+        />
+        <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={handleSearch}>Search</button>
+        {activeSearch && <button style={S.ch} onClick={clearSearch}>Clear</button>}
+        <span style={{ width: 1, height: 18, background: T.border, margin: "0 2px" }} />
+        <input
+          style={{ ...S.inp, width: 90, fontSize: 12, padding: "5px 8px", letterSpacing: 1, fontFamily: FONT, textTransform: "uppercase" }}
           value={codeInput}
           onChange={(e) => setCodeInput(e.target.value)}
           placeholder="Code..."
@@ -262,7 +355,31 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
                   </div>
                 </div>
                 <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={(e) => { e.stopPropagation(); onLoadPublic(c); }}>Load</button>
+                <button style={{ ...S.ch, color: copiedCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleCopyId(c.shortCode); }}>{copiedCode === c.shortCode ? "Copied!" : "Copy ID"}</button>
+                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteCode(deleteCode === c.shortCode ? null : c.shortCode); setDeleteConfirmText(""); }}>×</button>
               </div>
+              {/* Delete confirmation */}
+              {deleteCode === c.shortCode && (
+                <div style={{ padding: "8px 12px", background: T.bg, border: `1px solid ${T.danger}44`, borderTop: "none", borderRadius: previewIdx === i ? 0 : "0 0 6px 6px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 10, color: T.danger }}>Type "yes" to delete:</span>
+                  <input
+                    style={{ ...S.inp, width: 60, fontSize: 11, padding: "4px 8px", borderColor: T.danger + "44" }}
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && deleteConfirmText.toLowerCase() === "yes" && handleDeletePublic(c.shortCode)}
+                    placeholder="yes"
+                    autoFocus
+                  />
+                  <button
+                    style={{ ...S.ch, background: deleteConfirmText.toLowerCase() === "yes" ? T.danger : T.danger + "33", color: deleteConfirmText.toLowerCase() === "yes" ? "#fff" : T.danger, opacity: deleteConfirmText.toLowerCase() === "yes" ? 1 : 0.5 }}
+                    onClick={() => handleDeletePublic(c.shortCode)}
+                    disabled={deleteConfirmText.toLowerCase() !== "yes" || deleting}
+                  >
+                    {deleting ? "..." : "Delete"}
+                  </button>
+                  <button style={S.ch} onClick={() => { setDeleteCode(null); setDeleteConfirmText(""); }}>×</button>
+                </div>
+              )}
               {previewIdx === i && (
                 <div style={{ padding: 12, background: T.bg, border: `1px solid ${T.borderLight}`, borderTop: "none", borderRadius: "0 0 6px 6px" }}>
                   <CasePreview pans={c.pans} products={c.products} caseWidth={c.caseWidth} height={180} />
@@ -278,7 +395,7 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
         <div>
           {loading && <span style={{ fontSize: 11, color: T.textDim }}>Loading...</span>}
           {hasMore && !loading && (
-            <button style={{ ...S.ch, fontSize: 12 }} onClick={() => loadPage(page + 1)}>Load More</button>
+            <button style={{ ...S.ch, fontSize: 12 }} onClick={() => loadPage(page + 1, activeSearch)}>Load More</button>
           )}
         </div>
         <button style={S.bs} onClick={onClose}>Close</button>

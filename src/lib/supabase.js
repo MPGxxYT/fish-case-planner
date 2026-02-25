@@ -59,17 +59,23 @@ export async function publishCase(name, author, pans, products, caseWidth) {
 
 const PAGE_SIZE = 20;
 
-export async function fetchPublicCases(page = 0) {
+export async function fetchPublicCases(page = 0, search = "") {
   if (!supabase) throw new Error("Supabase is not configured.");
 
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE;
 
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("published_cases")
     .select("short_code, name, author, case_width, pans, products, created_at", { count: "exact" })
-    .order("created_at", { ascending: false })
-    .range(from, to);
+    .order("created_at", { ascending: false });
+
+  if (search.trim()) {
+    const term = `%${search.trim()}%`;
+    query = query.or(`name.ilike.${term},author.ilike.${term}`);
+  }
+
+  const { data, error, count } = await query.range(from, to);
 
   if (error) throw new Error(error.message);
 
@@ -110,4 +116,15 @@ export async function fetchCaseByCode(code) {
     products: data.products,
     createdAt: data.created_at,
   };
+}
+
+export async function deletePublicCase(shortCode) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { error } = await supabase
+    .from("published_cases")
+    .delete()
+    .eq("short_code", shortCode);
+
+  if (error) throw new Error(error.message);
 }

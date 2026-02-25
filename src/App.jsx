@@ -41,6 +41,8 @@ export default function App() {
   const [pansHistory, setPansHistory] = useState([]);
   const [pansRedo, setPansRedo] = useState([]);
   const [confirmRemovePan, setConfirmRemovePan] = useState(null);
+  const [toast, setToast] = useState(null);
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast((t) => t === msg ? null : t), 2000); };
 
   const [selectedProductId, setSelectedProductId] = useState(null);
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) : null;
@@ -184,7 +186,7 @@ export default function App() {
     setSaveName("");
     setShowSaveInput(false);
   };
-  const loadCase = (c) => { snapshotPans(); setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); };
+  const loadCase = (c) => { snapshotPans(); setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); showToast(`Loaded "${c.name}"`); };
   const deleteCase = (idx) => setSavedCases((sc) => sc.filter((_, i) => i !== idx));
   const exportCase = (c) => exportCaseToFile(c, products);
   const importCaseFile = async (file) => {
@@ -217,6 +219,7 @@ export default function App() {
     setPans(c.pans);
     setCaseWidth(c.caseWidth);
     setShowSaved(false);
+    showToast(`Loaded "${c.name}"`);
   };
 
   const handleSelectProduct = (id) => {
@@ -367,6 +370,15 @@ export default function App() {
       {confirmRemovePan && <ConfirmDialog message="Remove this pan? Any products in its slots will be unassigned." onConfirm={confirmRemovePanAction} onCancel={() => setConfirmRemovePan(null)} confirmLabel="Remove" />}
       {clearSlotConfirm && <ConfirmDialog message="Remove product from this slot? Consider editing instead if this was a mistake." onConfirm={confirmClearSlotAction} onCancel={() => setClearSlotConfirm(null)} confirmLabel="Remove" />}
       {confirmExpand && <ConfirmDialog message={`No room for ${confirmExpand.product.name} — needs ${confirmExpand.product.minPan} units but only ${remainingWidth} left. Add anyway and expand the case to ${pans.reduce((s, p) => s + p.width, 0) + confirmExpand.product.minPan}?`} onConfirm={confirmExpandAction} onCancel={() => setConfirmExpand(null)} confirmLabel="Add & Expand" />}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: isMobile ? 56 : 20, left: "50%", transform: "translateX(-50%)",
+          background: T.surface, color: T.text, border: `1px solid ${T.borderLight}`,
+          padding: "8px 20px", borderRadius: 8, fontSize: 12, fontFamily: DFONT, fontWeight: 600,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.4)", zIndex: 9999,
+          animation: "fadeIn 0.15s ease",
+        }}>{toast}</div>
+      )}
     </div>
   );
 }
