@@ -128,3 +128,15 @@ export async function deletePublicCase(shortCode) {
 
   if (error) throw new Error(error.message);
 }
+
+export async function updatePublicCase(shortCode, pans, products, caseWidth) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const usedProducts = getUsedProducts(pans, products);
+  const { error } = await supabase
+    .from("published_cases")
+    .update({ pans, products: usedProducts, case_width: caseWidth })
+    .eq("short_code", shortCode);
+
+  if (error) throw new Error(error.message);
+}

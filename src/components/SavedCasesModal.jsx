@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { T, S, FONT, DFONT } from "../utils/constants.js";
-import { isSupabaseConfigured, fetchPublicCases, fetchCaseByCode, publishCase, deletePublicCase } from "../lib/supabase.js";
+import { isSupabaseConfigured, fetchPublicCases, fetchCaseByCode, publishCase, deletePublicCase, updatePublicCase } from "../lib/supabase.js";
 import CasePreview from "./CasePreview.jsx";
 
 const TAB_STYLE = (active) => ({
@@ -17,7 +17,7 @@ const TAB_STYLE = (active) => ({
 
 /* ── Local tab ── */
 
-function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, onPublish, onClose }) {
+function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, onClose, onUpdateLocal }) {
   const fileRef = useRef(null);
   const [previewIdx, setPreviewIdx] = useState(null);
   const [publishIdx, setPublishIdx] = useState(null);
@@ -28,6 +28,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
   const [search, setSearch] = useState("");
   const [deleteIdx, setDeleteIdx] = useState(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [updateIdx, setUpdateIdx] = useState(null);
 
   const filtered = search.trim()
     ? savedCases.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -76,7 +77,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
               <div
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
-                  padding: "8px 10px", borderRadius: previewIdx === i ? "6px 6px 0 0" : 6,
+                  padding: "8px 10px", borderRadius: (previewIdx === i || deleteIdx === i || updateIdx === i || publishIdx === i || publishResult?.idx === i) ? "6px 6px 0 0" : 6,
                   background: T.surfaceAlt,
                   border: `1px solid ${previewIdx === i ? T.borderLight : T.border}`,
                   cursor: "pointer",
@@ -93,8 +94,18 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
                   <button style={S.ch} onClick={(e) => { e.stopPropagation(); setPublishIdx(publishIdx === i ? null : i); setPublishResult(null); }} title="Publish publicly">☁↑</button>
                 )}
                 <button style={S.ch} onClick={(e) => { e.stopPropagation(); onExport(c); }} title="Export to file">↓</button>
-                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteIdx(deleteIdx === i ? null : i); setDeleteConfirmText(""); }}>×</button>
+                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateIdx(updateIdx === i ? null : i); setDeleteIdx(null); setDeleteConfirmText(""); }} title="Overwrite with current case">↺</button>
+                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteIdx(deleteIdx === i ? null : i); setUpdateIdx(null); setDeleteConfirmText(""); }}>×</button>
               </div>
+
+              {/* Update confirmation */}
+              {updateIdx === i && (
+                <div style={{ padding: "8px 12px", background: T.bg, border: `1px solid ${T.accent}44`, borderTop: "none", borderRadius: (previewIdx === i || deleteIdx === i || publishIdx === i || publishResult?.idx === i) ? 0 : "0 0 6px 6px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: T.textMuted, flex: 1 }}>Replace "{c.name}" with the current case?</span>
+                  <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={() => { onUpdateLocal(savedCases.indexOf(c)); setUpdateIdx(null); }}>Confirm</button>
+                  <button style={S.ch} onClick={() => setUpdateIdx(null)}>Cancel</button>
+                </div>
+              )}
 
               {/* Delete confirmation */}
               {deleteIdx === i && (
@@ -171,7 +182,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
 
 /* ── Public tab ── */
 
-function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
+function PublicTab({ products: localProducts, onLoadPublic, onClose, currentPans, currentCaseWidth, onSavePublicToLocal }) {
   const [cases, setCases] = useState([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -201,6 +212,34 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
   const [deleteCode, setDeleteCode] = useState(null); // shortCode of case being deleted
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleting, setDeleting] = useState(false);
+
+  // Update public case
+  const [updateCode, setUpdateCode] = useState(null);
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState(null);
+
+  // Save to local feedback
+  const [savedLocalCode, setSavedLocalCode] = useState(null);
+  const handleSaveLocal = (c) => {
+    onSavePublicToLocal(c);
+    setSavedLocalCode(c.shortCode);
+    setTimeout(() => setSavedLocalCode((prev) => prev === c.shortCode ? null : prev), 1500);
+  };
+
+  const handleUpdatePublic = async (c) => {
+    setUpdating(true);
+    setUpdateError(null);
+    try {
+      await updatePublicCase(c.shortCode, currentPans, localProducts, currentCaseWidth);
+      const updated = await fetchCaseByCode(c.shortCode);
+      setCases((prev) => prev.map((x) => x.shortCode === c.shortCode ? updated : x));
+      setUpdateCode(null);
+    } catch (err) {
+      setUpdateError(err.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   const loadPage = useCallback(async (p, search) => {
     setLoading(true);
@@ -337,7 +376,7 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
               <div
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
-                  padding: "8px 10px", borderRadius: previewIdx === i ? "6px 6px 0 0" : 6,
+                  padding: "8px 10px", borderRadius: (previewIdx === i || deleteCode === c.shortCode || updateCode === c.shortCode) ? "6px 6px 0 0" : 6,
                   background: T.surfaceAlt,
                   border: `1px solid ${previewIdx === i ? T.borderLight : T.border}`,
                   cursor: "pointer",
@@ -356,8 +395,20 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
                 </div>
                 <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={(e) => { e.stopPropagation(); onLoadPublic(c); }}>Load</button>
                 <button style={{ ...S.ch, color: copiedCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleCopyId(c.shortCode); }}>{copiedCode === c.shortCode ? "Copied!" : "Copy ID"}</button>
-                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteCode(deleteCode === c.shortCode ? null : c.shortCode); setDeleteConfirmText(""); }}>×</button>
+                <button style={{ ...S.ch, color: savedLocalCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleSaveLocal(c); }} title="Save to local">{savedLocalCode === c.shortCode ? "Saved!" : "💾"}</button>
+                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateCode(updateCode === c.shortCode ? null : c.shortCode); setUpdateError(null); setDeleteCode(null); setDeleteConfirmText(""); }} title="Overwrite with current case">↺</button>
+                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteCode(deleteCode === c.shortCode ? null : c.shortCode); setUpdateCode(null); setUpdateError(null); setDeleteConfirmText(""); }}>×</button>
               </div>
+              {/* Update confirmation */}
+              {updateCode === c.shortCode && (
+                <div style={{ padding: "8px 12px", background: T.bg, border: `1px solid ${T.accent}44`, borderTop: "none", borderRadius: (previewIdx === i || deleteCode === c.shortCode) ? 0 : "0 0 6px 6px", display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: T.textMuted, flex: 1 }}>Replace "{c.name}" with the current case?</span>
+                  {updateError && <span style={{ fontSize: 10, color: T.danger }}>{updateError}</span>}
+                  <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={() => handleUpdatePublic(c)} disabled={updating}>{updating ? "..." : "Confirm"}</button>
+                  <button style={S.ch} onClick={() => { setUpdateCode(null); setUpdateError(null); }}>Cancel</button>
+                </div>
+              )}
+
               {/* Delete confirmation */}
               {deleteCode === c.shortCode && (
                 <div style={{ padding: "8px 12px", background: T.bg, border: `1px solid ${T.danger}44`, borderTop: "none", borderRadius: previewIdx === i ? 0 : "0 0 6px 6px", display: "flex", alignItems: "center", gap: 8 }}>
@@ -392,8 +443,9 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
 
       {/* Load more / loading */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12, gap: 8 }}>
-        <div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {loading && <span style={{ fontSize: 11, color: T.textDim }}>Loading...</span>}
+          {!loading && <button style={{ ...S.ch, fontSize: 12 }} onClick={() => { setPreviewIdx(null); loadPage(0, activeSearch); }} title="Refresh list">↻ Refresh</button>}
           {hasMore && !loading && (
             <button style={{ ...S.ch, fontSize: 12 }} onClick={() => loadPage(page + 1, activeSearch)}>Load More</button>
           )}
@@ -406,7 +458,7 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose }) {
 
 /* ── Main modal ── */
 
-export default function SavedCasesModal({ savedCases, products, onLoad, onDelete, onExport, onImport, onLoadPublic, onClose }) {
+export default function SavedCasesModal({ savedCases, products, onLoad, onDelete, onExport, onImport, onLoadPublic, onUpdateLocal, onSavePublicToLocal, currentPans, currentCaseWidth, onClose }) {
   const [tab, setTab] = useState("local");
 
   return (
@@ -424,11 +476,17 @@ export default function SavedCasesModal({ savedCases, products, onLoad, onDelete
           <LocalTab
             savedCases={savedCases} products={products}
             onLoad={onLoad} onDelete={onDelete} onExport={onExport} onImport={onImport}
+            onUpdateLocal={onUpdateLocal}
             onClose={onClose}
           />
         )}
         {tab === "public" && (
-          <PublicTab products={products} onLoadPublic={onLoadPublic} onClose={onClose} />
+          <PublicTab
+            products={products} onLoadPublic={onLoadPublic}
+            onSavePublicToLocal={onSavePublicToLocal}
+            currentPans={currentPans} currentCaseWidth={currentCaseWidth}
+            onClose={onClose}
+          />
         )}
       </div>
     </div>

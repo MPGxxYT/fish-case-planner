@@ -116,22 +116,25 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
               {/* Width row */}
               <div style={{ fontSize: 8, color: T.textDim, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 0.5 }}>Width</div>
               <div style={{ display: "flex", gap: 2 }}>
-                {PAN_WIDTHS.map((w) => (
-                  <button
-                    key={w}
-                    disabled={w > maxAllowed}
-                    onClick={(e) => { e.stopPropagation(); selectWidth(w); }}
-                    style={{
-                      background: w === pan.width ? T.accent : T.surfaceAlt,
-                      color: w === pan.width ? T.bg : w > maxAllowed ? T.textDim + "44" : T.text,
-                      border: "none", borderRadius: 4, padding: "4px 8px", fontSize: 13,
-                      fontWeight: 700, fontFamily: FONT, cursor: w > maxAllowed ? "not-allowed" : "pointer",
-                      opacity: w > maxAllowed ? 0.4 : 1, flex: 1,
-                    }}
-                  >
-                    {w}
-                  </button>
-                ))}
+                {PAN_WIDTHS.map((w) => {
+                  const oversize = w > maxAllowed;
+                  return (
+                    <button
+                      key={w}
+                      onClick={(e) => { e.stopPropagation(); selectWidth(w); }}
+                      style={{
+                        background: w === pan.width ? T.accent : T.surfaceAlt,
+                        color: w === pan.width ? T.bg : oversize ? T.warning : T.text,
+                        border: `1px solid ${oversize ? T.warning + "55" : "transparent"}`,
+                        borderRadius: 4, padding: "4px 8px", fontSize: 13,
+                        fontWeight: 700, fontFamily: FONT, cursor: "pointer", flex: 1,
+                      }}
+                      title={oversize ? `Expands case by ${w - maxAllowed} units` : undefined}
+                    >
+                      {w}
+                    </button>
+                  );
+                })}
               </div>
               {/* Depth split row — only for widths that can split */}
               {canSplitDepth(pan.width) && (

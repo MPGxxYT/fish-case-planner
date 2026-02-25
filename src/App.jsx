@@ -31,7 +31,6 @@ export default function App() {
   const [showAutoGen, setShowAutoGen] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -89,7 +88,7 @@ export default function App() {
     if (pan.id !== panId) return pan;
     return { ...pan, slotTypes: { ...pan.slotTypes, [slotIdx]: type } };
   }));
-  const setPanWidth = (panId, newWidth) => {
+  const applyPanWidth = (panId, newWidth) => {
     snapshotPans();
     setPans((p) => p.map((pan) => {
       if (pan.id !== panId) return pan;
@@ -101,6 +100,16 @@ export default function App() {
       }
       return updated;
     }));
+  };
+  const setPanWidth = (panId, newWidth) => {
+    const pan = pans.find((p) => p.id === panId);
+    const currentUsed = pans.reduce((s, p) => s + p.width, 0);
+    const overflow = (currentUsed - (pan?.width ?? 0) + newWidth) - caseWidth;
+    if (overflow > 0) {
+      setConfirmExpand({ type: "resize", panId, newWidth, newCaseWidth: caseWidth + overflow });
+      return;
+    }
+    applyPanWidth(panId, newWidth);
   };
   const setPanDepth = (panId, newDepth) => {
     snapshotPans();
@@ -137,12 +146,18 @@ export default function App() {
   };
   const confirmExpandAction = () => {
     if (!confirmExpand) return;
-    const { productId, insertIdx, product } = confirmExpand;
-    const newPan = { id: uid(), width: product.minPan, depth: "full", panType: product.deepShallow, slots: { 0: productId } };
-    const currentUsed = pans.reduce((s, p) => s + p.width, 0);
-    snapshotPans();
-    setCaseWidth(currentUsed + product.minPan);
-    setPans((p) => { const a = [...p]; a.splice(insertIdx, 0, newPan); return a; });
+    if (confirmExpand.type === "resize") {
+      const { panId, newWidth, newCaseWidth } = confirmExpand;
+      setCaseWidth(Math.min(150, newCaseWidth));
+      applyPanWidth(panId, newWidth);
+    } else {
+      const { productId, insertIdx, product } = confirmExpand;
+      const newPan = { id: uid(), width: product.minPan, depth: "full", panType: product.deepShallow, slots: { 0: productId } };
+      const currentUsed = pans.reduce((s, p) => s + p.width, 0);
+      snapshotPans();
+      setCaseWidth(Math.min(150, currentUsed + product.minPan));
+      setPans((p) => { const a = [...p]; a.splice(insertIdx, 0, newPan); return a; });
+    }
     setConfirmExpand(null);
   };
   const assignProduct = (panId, slotIdx, productId) => setPans((p) => p.map((pan) => (pan.id === panId ? { ...pan, slots: { ...pan.slots, [slotIdx]: productId } } : pan)));
@@ -188,6 +203,10 @@ export default function App() {
   };
   const loadCase = (c) => { snapshotPans(); setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); showToast(`Loaded "${c.name}"`); };
   const deleteCase = (idx) => setSavedCases((sc) => sc.filter((_, i) => i !== idx));
+  const updateLocalCase = (idx) => {
+    setSavedCases((sc) => sc.map((c, i) => i === idx ? { ...c, pans: JSON.parse(JSON.stringify(pans)), caseWidth, savedAt: new Date().toISOString() } : c));
+    showToast("Save updated");
+  };
   const exportCase = (c) => exportCaseToFile(c, products);
   const importCaseFile = async (file) => {
     try {
@@ -221,6 +240,15 @@ export default function App() {
     setShowSaved(false);
     showToast(`Loaded "${c.name}"`);
   };
+  const savePublicToLocal = (c) => {
+    setProducts((ps) => {
+      const existing = new Set(ps.map((p) => p.id));
+      const newProducts = c.products.filter((p) => !existing.has(p.id));
+      return newProducts.length > 0 ? [...ps, ...newProducts] : ps;
+    });
+    setSavedCases((sc) => [...sc, { name: c.name, pans: c.pans, caseWidth: c.caseWidth, savedAt: new Date().toISOString() }]);
+    showToast(`Saved "${c.name}" to local`);
+  };
 
   const handleSelectProduct = (id) => {
     if (selectedProductId === id) { setSelectedProductId(null); return; }
@@ -244,7 +272,6 @@ export default function App() {
           <h1 style={{ margin: 0, fontSize: 16, fontWeight: 800, fontFamily: DFONT, background: `linear-gradient(135deg,${T.accent},#818cf8)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Case Planner</h1>
         </div>
         <div style={{ flex: 1 }} />
-        {!isMobile && <button style={S.hb} onClick={() => setSidebarOpen(!sidebarOpen)}>{sidebarOpen ? "◀ Hide" : "📦 Products"}</button>}
         <button style={S.hb} onClick={() => setShowAutoGen(true)}>⚡ Auto</button>
         <button style={S.hb} onClick={() => setShowSaved(true)}>📁 Saved</button>
         <button style={S.hb} onClick={() => setShowPrint(true)}>🖨 Print</button>
@@ -257,119 +284,113 @@ export default function App() {
           <button onClick={() => setPortraitDismissed(true)} style={{ background: "none", border: "none", color: T.textDim, cursor: "pointer", fontSize: 16, padding: "0 2px", lineHeight: 1 }}>×</button>
         </div>
       )}
-      <div style={{ display: "flex", minHeight: "calc(100vh - 50px)" }}>
-        {/* Desktop sidebar */}
-        {!isMobile && sidebarOpen && (
-          <aside style={{ width: 280, minWidth: 280, padding: 10, background: T.surface, borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <h3 style={{ margin: 0, fontSize: 13, color: T.textMuted, fontFamily: FONT }}>PRODUCT POOL</h3>
-              <button style={{ ...S.bp, fontSize: 10, padding: "3px 10px" }} onClick={() => setShowProductForm("new")}>+ New</button>
+      <main style={{ padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? 66 : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
+            Case:<input type="number" value={caseWidth} onChange={(e) => setCaseWidth(Math.min(150, Math.max(usedWidth, Math.max(1, +e.target.value))))} style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }} />
+          </label>
+          <span style={{ fontSize: 11, fontFamily: FONT, padding: "3px 8px", borderRadius: 4, background: remainingWidth < 0 ? T.danger + "33" : T.accentDim + "33", color: remainingWidth < 0 ? T.danger : T.accent }}>
+            {usedWidth}/{caseWidth} · {remainingWidth} left
+          </span>
+          {showSaveInput ? (
+            <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input style={{ ...S.inp, width: 130, fontSize: 11, padding: "4px 8px" }} value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Case name..." onKeyDown={(e) => e.key === "Enter" && saveCase()} autoFocus />
+              <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={saveCase}>Save</button>
+              <button style={S.ch} onClick={() => setShowSaveInput(false)}>×</button>
             </div>
-            <p style={{ fontSize: 10, color: T.textDim, margin: "0 0 8px", lineHeight: 1.4 }}>Drag products into pan slots</p>
-            <ProductPool {...poolProps} />
-          </aside>
+          ) : (
+            <button style={S.ch} onClick={() => setShowSaveInput(true)}>💾 Save</button>
+          )}
+          <button style={{ ...S.ch, color: T.danger }} onClick={() => setConfirmClear(true)}>🗑 Clear</button>
+          <button style={{ ...S.ch, opacity: pansHistory.length === 0 ? 0.35 : 1 }} disabled={pansHistory.length === 0} onClick={handleUndo}>↩ Undo</button>
+          <button style={{ ...S.ch, opacity: pansRedo.length === 0 ? 0.35 : 1 }} disabled={pansRedo.length === 0} onClick={handleRedo}>↪ Redo</button>
+        </div>
+
+        <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} />
+
+        <CaseGrid
+          pans={pans} products={products} caseWidth={caseWidth}
+          onAssignProduct={assignProduct} onClearSlot={clearSlot} onDirectClearSlot={directClearSlot}
+          onRemovePan={handleRemovePanClick} onSetPanType={setPanType} onSetSlotType={setSlotType}
+          onSetPanWidth={setPanWidth} onSetPanDepth={setPanDepth} onCreatePanFromProduct={createPanFromProduct}
+          insertTarget={insertTarget} onPanDragStart={onPanDragStart}
+          onPanDragOver={onPanDragOver} onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
+          setInsertTarget={setInsertTarget} setPanDragId={setPanDragId} panDragId={panDragId}
+          isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
+          selectedProductId={selectedProductId} onMobilePlaceProduct={handleMobilePlaceProduct}
+        />
+
+        {colorWarnings.length > 0 && (
+          <div style={{ padding: "6px 10px", borderRadius: 6, background: T.warning + "12", border: `1px solid ${T.warning}22` }}>
+            {colorWarnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: T.warning }}>⚠ {w}</div>)}
+          </div>
         )}
 
-        <main style={{ flex: 1, padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? 52 + 14 : 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
-              Case:<input type="number" value={caseWidth} onChange={(e) => setCaseWidth(Math.max(usedWidth, Math.max(1, +e.target.value)))} style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }} />
-            </label>
-            <span style={{ fontSize: 11, fontFamily: FONT, padding: "3px 8px", borderRadius: 4, background: remainingWidth < 0 ? T.danger + "33" : T.accentDim + "33", color: remainingWidth < 0 ? T.danger : T.accent }}>
-              {usedWidth}/{caseWidth} · {remainingWidth} left
-            </span>
-            {showSaveInput ? (
-              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                <input style={{ ...S.inp, width: 130, fontSize: 11, padding: "4px 8px" }} value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Case name..." onKeyDown={(e) => e.key === "Enter" && saveCase()} autoFocus />
-                <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={saveCase}>Save</button>
-                <button style={S.ch} onClick={() => setShowSaveInput(false)}>×</button>
-              </div>
-            ) : (
-              <button style={S.ch} onClick={() => setShowSaveInput(true)}>💾 Save</button>
-            )}
-            <button style={{ ...S.ch, color: T.danger }} onClick={() => setConfirmClear(true)}>🗑 Clear</button>
-            <button style={{ ...S.ch, opacity: pansHistory.length === 0 ? 0.35 : 1 }} disabled={pansHistory.length === 0} onClick={handleUndo}>↩ Undo</button>
-            <button style={{ ...S.ch, opacity: pansRedo.length === 0 ? 0.35 : 1 }} disabled={pansRedo.length === 0} onClick={handleRedo}>↪ Redo</button>
-          </div>
+      </main>
 
-          <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} />
-
-          <CaseGrid
-            pans={pans} products={products} caseWidth={caseWidth}
-            onAssignProduct={assignProduct} onClearSlot={clearSlot} onDirectClearSlot={directClearSlot}
-            onRemovePan={handleRemovePanClick} onSetPanType={setPanType} onSetSlotType={setSlotType}
-            onSetPanWidth={setPanWidth} onSetPanDepth={setPanDepth} onCreatePanFromProduct={createPanFromProduct}
-            insertTarget={insertTarget} onPanDragStart={onPanDragStart}
-            onPanDragOver={onPanDragOver} onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
-            setInsertTarget={setInsertTarget} setPanDragId={setPanDragId} panDragId={panDragId}
-            isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
-            selectedProductId={selectedProductId} onMobilePlaceProduct={handleMobilePlaceProduct}
-          />
-
-          {colorWarnings.length > 0 && (
-            <div style={{ padding: "6px 10px", borderRadius: 6, background: T.warning + "12", border: `1px solid ${T.warning}22` }}>
-              {colorWarnings.map((w, i) => <div key={i} style={{ fontSize: 10, color: T.warning }}>⚠ {w}</div>)}
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* Mobile bottom drawer */}
-      {isMobile && (
-        <>
-          {drawerOpen && (
-            <div onClick={() => setDrawerOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 200 }} />
-          )}
-          {/* Selected product banner — shown above the drawer when a product is selected */}
-          {selectedProduct && !drawerOpen && (
-            <div style={{
-              position: "fixed", bottom: 44, left: 0, right: 0, zIndex: 299,
-              background: T.accent, padding: "8px 14px",
-              display: "flex", alignItems: "center", gap: 8,
-            }}>
-              <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: T.bg, fontFamily: DFONT }}>
-                {selectedProduct.name} — tap a slot to place
-              </span>
-              <button
-                onClick={() => setSelectedProductId(null)}
-                style={{ background: "none", border: "none", color: T.bg, fontSize: 18, cursor: "pointer", padding: "0 2px", lineHeight: 1, opacity: 0.8 }}
-              >×</button>
-            </div>
-          )}
-          <div style={{
-            position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 300,
-            background: T.surface, borderTop: `1px solid ${T.borderLight}`,
-            borderRadius: "12px 12px 0 0",
-            height: drawerOpen ? "58vh" : 44,
-            transition: "height 0.25s ease",
-            display: "flex", flexDirection: "column", overflow: "hidden",
-          }}>
-            {/* Handle bar */}
-            <div
-              onClick={() => setDrawerOpen((o) => !o)}
-              style={{ height: 44, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", cursor: "pointer", touchAction: "manipulation" }}
-            >
-              <span style={{ fontSize: 12, color: selectedProductId ? T.accent : T.textMuted, fontFamily: FONT, userSelect: "none", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: selectedProductId ? 700 : 400 }}>
-                {selectedProductId ? `${selectedProduct?.name} selected ▲` : `Products ${drawerOpen ? "▼" : "▲"}`}
-              </span>
-              <button style={{ ...S.bp, fontSize: 10, padding: "3px 10px" }} onClick={(e) => { e.stopPropagation(); setShowProductForm("new"); }}>+ New</button>
-            </div>
-            {/* Drawer content — always mounted so source elements stay in the DOM during drag */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "0 10px 10px", display: "flex", flexDirection: "column", gap: 6, visibility: drawerOpen ? "visible" : "hidden", pointerEvents: drawerOpen ? "auto" : "none" }}>
-              <ProductPool {...poolProps} />
-            </div>
-          </div>
-        </>
+      {/* Product pool — fixed bottom bar for both desktop and mobile */}
+      {isMobile && selectedProduct && !drawerOpen && (
+        <div style={{
+          position: "fixed", bottom: 44, left: 0, right: 0, zIndex: 299,
+          background: T.accent, padding: "8px 14px",
+          display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{ flex: 1, fontSize: 12, fontWeight: 700, color: T.bg, fontFamily: DFONT }}>
+            {selectedProduct.name} — tap a slot to place
+          </span>
+          <button
+            onClick={() => setSelectedProductId(null)}
+            style={{ background: "none", border: "none", color: T.bg, fontSize: 18, cursor: "pointer", padding: "0 2px", lineHeight: 1, opacity: 0.8 }}
+          >×</button>
+        </div>
       )}
+      <div style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 300,
+        background: T.surface, borderTop: `1px solid ${T.borderLight}`,
+        borderRadius: "12px 12px 0 0",
+        height: drawerOpen ? (isMobile ? "58vh" : "45vh") : 48,
+        transition: "height 0.25s ease",
+        display: "flex", flexDirection: "column", overflow: "hidden",
+      }}>
+        {/* Handle bar */}
+        <div
+          onClick={() => setDrawerOpen((o) => !o)}
+          style={{ height: 48, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", cursor: "pointer", touchAction: "manipulation", position: "relative" }}
+        >
+          <span style={{
+            fontSize: isMobile ? 12 : 14,
+            color: isMobile && selectedProductId ? T.accent : T.textMuted,
+            fontFamily: isMobile ? FONT : DFONT,
+            userSelect: "none",
+            fontWeight: isMobile && selectedProductId ? 700 : 700,
+            textTransform: isMobile ? "uppercase" : "none",
+            letterSpacing: isMobile ? 0.5 : 0,
+          }}>
+            {isMobile && selectedProductId ? `${selectedProduct?.name} selected` : "Products"} {drawerOpen ? "▼" : "▲"}
+          </span>
+          <button style={{ ...S.bp, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 10px" : "5px 14px", position: "absolute", right: 16 }} onClick={(e) => { e.stopPropagation(); setShowProductForm("new"); }}>+ New</button>
+        </div>
+        {/* Pool content — always mounted so drag source elements stay in DOM */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 10px 10px", display: "flex", flexDirection: "column", gap: 6, visibility: drawerOpen ? "visible" : "hidden", pointerEvents: drawerOpen ? "auto" : "none" }}>
+          <ProductPool {...poolProps} />
+        </div>
+      </div>
 
       {showProductForm && <ProductFormModal product={showProductForm === "new" ? null : showProductForm} onSave={handleProductSave} onClose={() => setShowProductForm(null)} />}
       {showAutoGen && <AutoGenModal products={products} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
-      {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadPublicCase} onClose={() => setShowSaved(false)} />}
+      {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadPublicCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentPans={pans} currentCaseWidth={caseWidth} onClose={() => setShowSaved(false)} />}
       {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { snapshotPans(); setPans([]); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
       {confirmRemovePan && <ConfirmDialog message="Remove this pan? Any products in its slots will be unassigned." onConfirm={confirmRemovePanAction} onCancel={() => setConfirmRemovePan(null)} confirmLabel="Remove" />}
       {clearSlotConfirm && <ConfirmDialog message="Remove product from this slot? Consider editing instead if this was a mistake." onConfirm={confirmClearSlotAction} onCancel={() => setClearSlotConfirm(null)} confirmLabel="Remove" />}
-      {confirmExpand && <ConfirmDialog message={`No room for ${confirmExpand.product.name} — needs ${confirmExpand.product.minPan} units but only ${remainingWidth} left. Add anyway and expand the case to ${pans.reduce((s, p) => s + p.width, 0) + confirmExpand.product.minPan}?`} onConfirm={confirmExpandAction} onCancel={() => setConfirmExpand(null)} confirmLabel="Add & Expand" />}
+      {confirmExpand && <ConfirmDialog
+        message={confirmExpand.type === "resize"
+          ? `Resizing this pan to ${confirmExpand.newWidth} won't fit — the case would need to expand to ${confirmExpand.newCaseWidth} units. Expand the case?`
+          : `No room for ${confirmExpand.product.name} — needs ${confirmExpand.product.minPan} units but only ${remainingWidth} left. Add anyway and expand the case to ${pans.reduce((s, p) => s + p.width, 0) + confirmExpand.product.minPan}?`}
+        onConfirm={confirmExpandAction}
+        onCancel={() => setConfirmExpand(null)}
+        confirmLabel="Expand & Apply"
+      />}
       {toast && (
         <div style={{
           position: "fixed", bottom: isMobile ? 56 : 20, left: "50%", transform: "translateX(-50%)",

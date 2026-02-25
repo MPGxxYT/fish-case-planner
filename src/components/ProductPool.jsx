@@ -30,9 +30,9 @@ export default function ProductPool({ products, filters, setFilters, onEdit, onD
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0 }}>
-      <input style={S.inp} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name / PLU..." />
-      {/* Filter / Sort toggle buttons */}
-      <div style={{ display: "flex", gap: 4 }}>
+      {/* Search + Filter/Sort — inline row on desktop, stacked on mobile */}
+      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+        <input style={{ ...S.inp, flex: isMobile ? "1 1 100%" : "1 1 auto", minWidth: 120 }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name / PLU..." />
         <button
           type="button"
           onClick={() => { setShowFiltersPanel((v) => !v); setShowSortPanel(false); }}
@@ -102,10 +102,9 @@ export default function ProductPool({ products, filters, setFilters, onEdit, onD
       <div style={{
         flex: 1,
         overflowY: "auto",
-        display: isMobile ? "grid" : "flex",
-        gridTemplateColumns: isMobile ? "1fr 1fr 1fr 1fr" : undefined,
-        flexDirection: isMobile ? undefined : "column",
-        gap: isMobile ? 4 : 2,
+        display: "grid",
+        gridTemplateColumns: isMobile ? "repeat(4, 1fr)" : "repeat(auto-fill, minmax(180px, 1fr))",
+        gap: 4,
         alignContent: "start",
       }}>
         {filtered.map((p) => {
@@ -113,7 +112,7 @@ export default function ProductPool({ products, filters, setFilters, onEdit, onD
           const color = PRODUCT_COLORS[p.color];
 
           if (isMobile) {
-            // Compact 3-column card for mobile
+            // Compact card for mobile
             return (
               <div
                 key={p.id}
@@ -145,7 +144,7 @@ export default function ProductPool({ products, filters, setFilters, onEdit, onD
                   </div>
                 </div>
                 {/* Bottom row: edit + demand + deep/shallow + grip handle */}
-                <div style={{ display: "flex", alignItems: "center", gap: 3, paddingLeft: 2 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 3, paddingLeft: 2, marginTop: "auto" }}>
                   <button
                     onClick={(e) => { e.stopPropagation(); onEdit(p); }}
                     style={{
@@ -184,41 +183,50 @@ export default function ProductPool({ products, filters, setFilters, onEdit, onD
             );
           }
 
-          // Desktop: full-detail single-column card (unchanged)
+          // Desktop: grid card
           return (
             <div key={p.id} data-pool-item draggable
               onDragStart={(e) => { e.dataTransfer.setData("productId", p.id); e.dataTransfer.setData("dragType", "product"); }}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 5, background: T.surfaceAlt, border: `1px solid ${T.border}`, cursor: "grab", userSelect: "none" }}>
-              {/* Grip handle for desktop drag (touch) */}
-              <span
-                onTouchStart={(e) => { e.stopPropagation(); startTouchDrag(e, { type: "product", productId: p.id }, e.currentTarget.parentElement); }}
-                style={{ fontSize: 14, color: T.textDim, cursor: "grab", padding: "0 2px", touchAction: "none", flexShrink: 0 }}
-                title="Drag to insert new pan"
-              >⠿</span>
-              <span style={{ width: 10, height: 10, borderRadius: 2, background: PRODUCT_COLORS[p.color]?.bg, flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.name}</div>
-                <div style={{ fontSize: 9, color: T.textDim, fontFamily: FONT }}>
-                  {p.plu || "—"} · {p.fishType} · {p.cookType} · D:<span style={{ color: p.demand >= 7 ? T.success : p.demand >= 4 ? T.warning : T.danger }}>{p.demand}</span>
+              style={{
+                display: "flex", flexDirection: "column",
+                padding: "7px 8px 6px", borderRadius: 6,
+                background: T.surfaceAlt, border: `1px solid ${T.border}`,
+                cursor: "grab", userSelect: "none", position: "relative",
+                minHeight: 52, overflow: "hidden",
+              }}>
+              {/* Color bar */}
+              <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderRadius: "6px 0 0 6px", background: color?.bg ?? "#888" }} />
+              <div style={{ paddingLeft: 6, flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.text, lineHeight: 1.25, wordBreak: "break-word" }}>{p.name}</div>
+                <div style={{ fontSize: 9, color: T.textDim, fontFamily: FONT, marginTop: 1 }}>
+                  {p.plu || "—"} · {p.fishType} · D:<span style={{ color: p.demand >= 7 ? T.success : p.demand >= 4 ? T.warning : T.danger }}>{p.demand}</span>
                 </div>
-                {p.preferredPosition && <div style={{ fontSize: 8, color: T.accent, fontFamily: FONT, opacity: 0.7 }}>📍 {p.preferredPosition}</div>}
                 {(p.labels || []).length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 2, marginTop: 2 }}>
                     {(p.labels || []).map((key) => {
                       const lbl = PRODUCT_LABELS.find((l) => l.key === key);
                       if (!lbl) return null;
-                      return (
-                        <span key={key} style={{ fontSize: 8, padding: "1px 4px", borderRadius: 3, fontFamily: FONT, background: lbl.color + "22", color: lbl.color, fontWeight: 600 }}>
-                          {lbl.abbr}
-                        </span>
-                      );
+                      return <span key={key} style={{ fontSize: 7, padding: "1px 3px", borderRadius: 3, fontFamily: FONT, background: lbl.color + "22", color: lbl.color, fontWeight: 600 }}>{lbl.abbr}</span>;
                     })}
                   </div>
                 )}
               </div>
-              <span style={{ fontSize: 7, padding: "1px 4px", borderRadius: 3, fontFamily: FONT, textTransform: "uppercase", background: p.deepShallow === "deep" ? "#3b82f622" : "#f59e0b22", color: p.deepShallow === "deep" ? "#60a5fa" : "#fbbf24" }}>{p.deepShallow}</span>
-              <button style={{ ...S.tb, color: T.accent }} onClick={(e) => { e.stopPropagation(); onEdit(p); }}>✎</button>
-              <button style={{ ...S.tb, color: T.danger }} onClick={(e) => { e.stopPropagation(); setConfirmDel(p); }}>×</button>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, paddingLeft: 4, marginTop: 4 }}>
+                <span style={{
+                  fontSize: 8, padding: "1px 4px", borderRadius: 2, fontFamily: FONT, textTransform: "uppercase", flexShrink: 0,
+                  background: p.deepShallow === "deep" ? "#3b82f622" : "#f59e0b22",
+                  color: p.deepShallow === "deep" ? "#60a5fa" : "#fbbf24",
+                }}>{p.deepShallow === "deep" ? "Deep" : "Shallow"}</span>
+                <div style={{ flex: 1 }} />
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: T.accent, fontSize: 13, lineHeight: 1, padding: "2px 4px", flexShrink: 0 }}
+                >✎</button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setConfirmDel(p); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: T.danger, fontSize: 13, lineHeight: 1, padding: "2px 4px", flexShrink: 0 }}
+                >×</button>
+              </div>
             </div>
           );
         })}
