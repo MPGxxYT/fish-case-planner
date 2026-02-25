@@ -284,7 +284,7 @@ export default function App() {
           <button onClick={() => setPortraitDismissed(true)} style={{ background: "none", border: "none", color: T.textDim, cursor: "pointer", fontSize: 16, padding: "0 2px", lineHeight: 1 }}>×</button>
         </div>
       )}
-      <main style={{ padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? 66 : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
+      <main style={{ padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? (drawerOpen ? "calc(58vh + 14px)" : 66) : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
             Case:<input type="number" value={caseWidth} onChange={(e) => setCaseWidth(Math.min(150, Math.max(usedWidth, Math.max(1, +e.target.value))))} style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }} />

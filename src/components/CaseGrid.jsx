@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { T, FONT } from "../utils/constants.js";
 import PanColumn from "./PanColumn.jsx";
 
@@ -70,6 +70,15 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
     if (caseRef.current) obs.observe(caseRef.current);
     return () => obs.disconnect();
   }, []);
+
+  // On mobile: instantly reset horizontal scroll when case shrinks so iOS doesn't animate it
+  const prevCaseWidthRef = useRef(caseWidth);
+  useLayoutEffect(() => {
+    if (isMobile && caseRef.current && caseWidth < prevCaseWidthRef.current) {
+      caseRef.current.scrollLeft = 0;
+    }
+    prevCaseWidthRef.current = caseWidth;
+  }, [caseWidth, isMobile]);
 
   const usedWidth = pans.reduce((s, p) => s + p.width, 0);
   const remainingWidth = caseWidth - usedWidth;
