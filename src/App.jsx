@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { T, S, FONT, DFONT, DEFAULT_CASE_WIDTH } from "./utils/constants.js";
 import { uid, canSplitDepth } from "./utils/helpers.js";
+import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
 import { autoGenerateCase } from "./utils/autoGenerate.js";
 import { checkColorConflicts } from "./utils/colorConflicts.js";
 import { DEFAULT_PRODUCTS } from "./data/defaultProducts.js";
@@ -185,6 +186,38 @@ export default function App() {
   };
   const loadCase = (c) => { snapshotPans(); setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); };
   const deleteCase = (idx) => setSavedCases((sc) => sc.filter((_, i) => i !== idx));
+  const exportCase = (c) => exportCaseToFile(c, products);
+  const importCaseFile = async (file) => {
+    try {
+      const data = await readCaseFile(file);
+      // Merge in any products that don't already exist locally
+      setProducts((ps) => {
+        const existing = new Set(ps.map((p) => p.id));
+        const newProducts = data.products.filter((p) => !existing.has(p.id));
+        return newProducts.length > 0 ? [...ps, ...newProducts] : ps;
+      });
+      setSavedCases((sc) => [...sc, {
+        name: data.case.name,
+        pans: data.case.pans,
+        caseWidth: data.case.caseWidth,
+        savedAt: data.case.savedAt || new Date().toISOString(),
+      }]);
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+  const loadPublicCase = (c) => {
+    // Merge products that don't exist locally
+    setProducts((ps) => {
+      const existing = new Set(ps.map((p) => p.id));
+      const newProducts = c.products.filter((p) => !existing.has(p.id));
+      return newProducts.length > 0 ? [...ps, ...newProducts] : ps;
+    });
+    snapshotPans();
+    setPans(c.pans);
+    setCaseWidth(c.caseWidth);
+    setShowSaved(false);
+  };
 
   const handleSelectProduct = (id) => {
     if (selectedProductId === id) { setSelectedProductId(null); return; }
@@ -329,7 +362,7 @@ export default function App() {
       {showProductForm && <ProductFormModal product={showProductForm === "new" ? null : showProductForm} onSave={handleProductSave} onClose={() => setShowProductForm(null)} />}
       {showAutoGen && <AutoGenModal products={products} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
-      {showSaved && <SavedCasesModal savedCases={savedCases} onLoad={loadCase} onDelete={deleteCase} onClose={() => setShowSaved(false)} />}
+      {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadPublicCase} onClose={() => setShowSaved(false)} />}
       {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { snapshotPans(); setPans([]); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
       {confirmRemovePan && <ConfirmDialog message="Remove this pan? Any products in its slots will be unassigned." onConfirm={confirmRemovePanAction} onCancel={() => setConfirmRemovePan(null)} confirmLabel="Remove" />}
       {clearSlotConfirm && <ConfirmDialog message="Remove product from this slot? Consider editing instead if this was a mistake." onConfirm={confirmClearSlotAction} onCancel={() => setClearSlotConfirm(null)} confirmLabel="Remove" />}
