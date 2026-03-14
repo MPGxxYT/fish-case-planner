@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { T, FONT, DFONT, PRODUCT_COLORS, DEPTH_UNITS, CASE_DEPTH, PRODUCT_LABELS } from "../utils/constants.js";
 import { getSlotLabel } from "../utils/helpers.js";
 
-export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onClearSlot, onDirectClearSlot, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onMobilePlaceProduct }) {
+export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onClearSlot, onDirectClearSlot, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
   const [dOver, setDOver] = useState(false);
   const slotRef = useRef();
   const product = pan.slots[slotIdx] ? products.find((p) => p.id === pan.slots[slotIdx]) : null;
@@ -18,7 +18,11 @@ export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onCle
       onMobilePlaceProduct?.(pan.id, slotIdx);
       return;
     }
-    if (product) onClearSlot(pan.id, slotIdx);
+    if (product) {
+      onClearSlot(pan.id, slotIdx);
+    } else {
+      onPickProduct?.(pan.id, slotIdx);
+    }
   };
 
   return (
@@ -64,7 +68,7 @@ export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onCle
         outlineOffset: -1,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         position: "relative", overflow: "hidden", transition: "background 0.12s",
-        cursor: isPlaceMode ? "copy" : product ? "grab" : "default", userSelect: "none",
+        cursor: isPlaceMode ? "copy" : product ? "grab" : "pointer", userSelect: "none",
       }}
       title={isPlaceMode ? "Tap to place here" : product ? `${product.name}${product.plu ? ` (${product.plu})` : ""}\nDrag to swap · Tap to remove` : undefined}
     >

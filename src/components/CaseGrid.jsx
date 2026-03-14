@@ -58,7 +58,7 @@ function getPanSummary(pans) {
   return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, isPortrait, startTouchDrag, selectedProductId, onMobilePlaceProduct }) {
+export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, isPortrait, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
   const [hoverInsertIdx, setHoverInsertIdx] = useState(null);
@@ -151,6 +151,7 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
                       onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
                       startTouchDrag={startTouchDrag} isMobile={isMobile}
                       selectedProductId={selectedProductId} onMobilePlaceProduct={onMobilePlaceProduct}
+                      onPickProduct={onPickProduct}
                     />
                     {/* Insert zone after each pan */}
                     <InsertZone idx={i + 1} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} />

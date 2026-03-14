@@ -9,7 +9,7 @@ const DEPTH_OPTIONS = [
   { key: "third", label: "Third" },
 ];
 
-export default function PanColumn({ pan, products, onAssignProduct, onClearSlot, onDirectClearSlot, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, startTouchDrag, isMobile, selectedProductId, onMobilePlaceProduct }) {
+export default function PanColumn({ pan, products, onAssignProduct, onClearSlot, onDirectClearSlot, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, startTouchDrag, isMobile, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
   const ds = getDepthSlots(pan.depth);
   const isSplit = pan.depth !== "full";
   const maxAllowed = (remainingWidth || 0) + pan.width;
@@ -171,6 +171,7 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
               totalDepthSlots={ds.length}
               startTouchDrag={startTouchDrag}
               selectedProductId={selectedProductId} onMobilePlaceProduct={onMobilePlaceProduct}
+              onPickProduct={onPickProduct}
             />
           ))}
         </div>

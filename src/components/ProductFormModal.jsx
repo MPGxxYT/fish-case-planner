@@ -24,8 +24,13 @@ export default function ProductFormModal({ product, onSave, onClose }) {
             <input style={S.inp} value={f.name} onChange={(e) => s("name", e.target.value)} placeholder="e.g. Atlantic Fillet" />
           </label>
           <label style={S.fl}>
-            PLU (optional)
-            <input style={S.inp} value={f.plu} onChange={(e) => s("plu", e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="5 digits" />
+            PLU
+            <input
+              style={{ ...S.inp, borderColor: f.plu.length > 0 ? T.border : T.danger + "88" }}
+              value={f.plu}
+              onChange={(e) => s("plu", e.target.value.replace(/\D/g, "").slice(0, 5))}
+              placeholder="5 digits (required)"
+            />
           </label>
           <div style={S.fl}>
             Labels
@@ -118,7 +123,7 @@ export default function ProductFormModal({ product, onSave, onClose }) {
         </div>
         <div style={{ display: "flex", gap: 8, marginTop: 20, justifyContent: "flex-end" }}>
           <button style={S.bs} onClick={onClose}>Cancel</button>
-          <button style={S.bp} onClick={() => { if (f.name.trim()) onSave({ ...f, name: toProperCase(f.name.trim()) }); }}>Save</button>
+          <button style={{ ...S.bp, opacity: f.name.trim() && f.plu ? 1 : 0.45 }} onClick={() => { if (f.name.trim() && f.plu) onSave({ ...f, name: toProperCase(f.name.trim()) }); }}>Save</button>
         </div>
       </div>
     </div>

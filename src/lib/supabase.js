@@ -140,3 +140,58 @@ export async function updatePublicCase(shortCode, pans, products, caseWidth) {
 
   if (error) throw new Error(error.message);
 }
+
+// ─── Shared Product Catalog ───────────────────────────────────────────────────
+
+function rowToProduct(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    plu: row.plu,
+    color: row.color,
+    cookType: row.cook_type,
+    fishType: row.fish_type,
+    maxPan: row.max_pan,
+    minPan: row.min_pan,
+    deepShallow: row.deep_shallow,
+    demand: row.demand,
+    preferredPosition: row.preferred_position || "",
+    labels: row.labels || [],
+  };
+}
+
+function productToRow(p) {
+  return {
+    id: p.id,
+    name: p.name,
+    plu: p.plu,
+    color: p.color,
+    cook_type: p.cookType,
+    fish_type: p.fishType,
+    max_pan: p.maxPan,
+    min_pan: p.minPan,
+    deep_shallow: p.deepShallow,
+    demand: p.demand,
+    preferred_position: p.preferredPosition || "",
+    labels: p.labels || [],
+  };
+}
+
+export async function fetchPublicProducts() {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.from("products").select("*").order("name");
+  if (error) throw new Error(error.message);
+  return data.map(rowToProduct);
+}
+
+export async function upsertPublicProduct(product) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { error } = await supabase.from("products").upsert(productToRow(product));
+  if (error) throw new Error(error.message);
+}
+
+export async function deletePublicProduct(id) {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { error } = await supabase.from("products").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}

@@ -1,33 +1,36 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { T, S, FONT, DFONT, DEFAULT_CASE_WIDTH } from "./utils/constants.js";
 import { uid, canSplitDepth } from "./utils/helpers.js";
 import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
+import { isSupabaseConfigured, fetchPublicProducts, upsertPublicProduct, deletePublicProduct } from "./lib/supabase.js";
 import { autoGenerateCase } from "./utils/autoGenerate.js";
 import { checkColorConflicts } from "./utils/colorConflicts.js";
-import { DEFAULT_PRODUCTS } from "./data/defaultProducts.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useCaseDrag } from "./hooks/useCaseDrag.js";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useTouchDrag } from "./hooks/useTouchDrag.js";
 import ConfirmDialog from "./components/ConfirmDialog.jsx";
-import ProductFormModal from "./components/ProductFormModal.jsx";
 import ProductPool from "./components/ProductPool.jsx";
 import AddPanControls from "./components/AddPanControls.jsx";
 import AutoGenModal from "./components/AutoGenModal.jsx";
 import PrintView from "./components/PrintView.jsx";
 import SavedCasesModal from "./components/SavedCasesModal.jsx";
 import CaseGrid from "./components/CaseGrid.jsx";
+import SlotPickerModal from "./components/SlotPickerModal.jsx";
+import ProductManagerModal from "./components/ProductManagerModal.jsx";
 
 const migrateColor = (c) => (c === "orange") ? "warm" : (c === "white" || c === "blue") ? "cool" : c;
 const migrateProducts = (ps) => ps.map((p) => ({ ...p, color: migrateColor(p.color), preferredPosition: p.preferredPosition || "", labels: p.labels || [] }));
 
 export default function App() {
-  const [products, setProducts] = useLocalStorage("fcp3_products", DEFAULT_PRODUCTS, migrateProducts);
+  // localStorage acts as a stale-while-revalidate cache for the Supabase products table.
+  // On mount, cached products are shown immediately, then the fresh fetch overwrites them.
+  const [products, setProducts] = useLocalStorage("fcp3_products", [], migrateProducts);
   const [pans, setPans] = useLocalStorage("fcp3_pans", []);
   const [caseWidth, setCaseWidth] = useLocalStorage("fcp3_cw", DEFAULT_CASE_WIDTH);
   const [savedCases, setSavedCases] = useLocalStorage("fcp3_sc", []);
   const [filters, setFilters] = useState({ color: "", cookType: "", fishType: "", deepShallow: "", sort: "name" });
-  const [showProductForm, setShowProductForm] = useState(null);
+  const [showProductManager, setShowProductManager] = useState(false);
   const [showAutoGen, setShowAutoGen] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
@@ -40,8 +43,27 @@ export default function App() {
   const [pansHistory, setPansHistory] = useState([]);
   const [pansRedo, setPansRedo] = useState([]);
   const [confirmRemovePan, setConfirmRemovePan] = useState(null);
+  const [slotPicker, setSlotPicker] = useState(null); // { panId, slotIdx }
+  const [productsRefreshing, setProductsRefreshing] = useState(false);
   const [toast, setToast] = useState(null);
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast((t) => t === msg ? null : t), 2000); };
+
+  // On mount, load products from the shared Supabase catalog (overrides local cache)
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    fetchPublicProducts()
+      .then((ps) => { if (ps.length > 0) setProducts(ps); })
+      .catch(() => {}); // Silently fall back to localStorage on error
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const refreshProducts = () => {
+    if (!isSupabaseConfigured || productsRefreshing) return;
+    setProductsRefreshing(true);
+    fetchPublicProducts()
+      .then((ps) => { setProducts(ps); showToast(`Products updated (${ps.length})`); })
+      .catch(() => showToast("Failed to refresh products"))
+      .finally(() => setProductsRefreshing(false));
+  };
 
   const [selectedProductId, setSelectedProductId] = useState(null);
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) : null;
@@ -184,7 +206,7 @@ export default function App() {
       if (idx >= 0) { const c = [...ps]; c[idx] = prod; return c; }
       return [...ps, prod];
     });
-    setShowProductForm(null);
+    if (isSupabaseConfigured) upsertPublicProduct(prod).catch(() => {});
   };
   const deleteProduct = (id) => {
     setProducts((ps) => ps.filter((p) => p.id !== id));
@@ -193,6 +215,7 @@ export default function App() {
       Object.keys(ns).forEach((k) => { if (ns[k] === id) ns[k] = null; });
       return { ...pan, slots: ns };
     }));
+    if (isSupabaseConfigured) deletePublicProduct(id).catch(() => {});
   };
   const handleGenerate = (items, w) => { snapshotPans(); setCaseWidth(w); setPans(autoGenerateCase(items, w)); setShowAutoGen(false); };
   const saveCase = () => {
@@ -211,12 +234,7 @@ export default function App() {
   const importCaseFile = async (file) => {
     try {
       const data = await readCaseFile(file);
-      // Merge in any products that don't already exist locally
-      setProducts((ps) => {
-        const existing = new Set(ps.map((p) => p.id));
-        const newProducts = data.products.filter((p) => !existing.has(p.id));
-        return newProducts.length > 0 ? [...ps, ...newProducts] : ps;
-      });
+      // Products live in the shared DB — no merging needed, just load the layout
       setSavedCases((sc) => [...sc, {
         name: data.case.name,
         pans: data.case.pans,
@@ -228,12 +246,6 @@ export default function App() {
     }
   };
   const loadPublicCase = (c) => {
-    // Merge products that don't exist locally
-    setProducts((ps) => {
-      const existing = new Set(ps.map((p) => p.id));
-      const newProducts = c.products.filter((p) => !existing.has(p.id));
-      return newProducts.length > 0 ? [...ps, ...newProducts] : ps;
-    });
     snapshotPans();
     setPans(c.pans);
     setCaseWidth(c.caseWidth);
@@ -241,11 +253,6 @@ export default function App() {
     showToast(`Loaded "${c.name}"`);
   };
   const savePublicToLocal = (c) => {
-    setProducts((ps) => {
-      const existing = new Set(ps.map((p) => p.id));
-      const newProducts = c.products.filter((p) => !existing.has(p.id));
-      return newProducts.length > 0 ? [...ps, ...newProducts] : ps;
-    });
     setSavedCases((sc) => [...sc, { name: c.name, pans: c.pans, caseWidth: c.caseWidth, savedAt: new Date().toISOString() }]);
     showToast(`Saved "${c.name}" to local`);
   };
@@ -255,6 +262,13 @@ export default function App() {
     setSelectedProductId(id);
     setDrawerOpen(false);
   };
+  const handlePickProduct = (panId, slotIdx) => setSlotPicker({ panId, slotIdx });
+  const handleSlotPickerAssign = (productId) => {
+    if (!slotPicker) return;
+    snapshotPans();
+    assignProduct(slotPicker.panId, slotPicker.slotIdx, productId);
+  };
+
   const handleMobilePlaceProduct = (panId, slotIdx) => {
     assignProduct(panId, slotIdx, selectedProductId);
     setSelectedProductId(null);
@@ -262,7 +276,7 @@ export default function App() {
 
   // Close drawer immediately at touchstart — safe because ProductPool stays mounted (CSS-only hide)
   const poolStartTouchDrag = (e, dragInfo, sourceEl) => { setDrawerOpen(false); startTouchDrag(e, dragInfo, sourceEl); };
-  const poolProps = { products, filters, setFilters, onEdit: (p) => setShowProductForm(p), onDelete: deleteProduct, startTouchDrag: poolStartTouchDrag, isMobile, selectedProductId, onSelectProduct: handleSelectProduct };
+  const poolProps = { products, filters, setFilters, startTouchDrag: poolStartTouchDrag, isMobile, selectedProductId, onSelectProduct: handleSelectProduct };
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: DFONT }}>
@@ -318,6 +332,7 @@ export default function App() {
           setInsertTarget={setInsertTarget} setPanDragId={setPanDragId} panDragId={panDragId}
           isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
           selectedProductId={selectedProductId} onMobilePlaceProduct={handleMobilePlaceProduct}
+          onPickProduct={handlePickProduct}
         />
 
         {colorWarnings.length > 0 && (
@@ -368,7 +383,17 @@ export default function App() {
           }}>
             {isMobile && selectedProductId ? `${selectedProduct?.name} selected` : "Products"} {drawerOpen ? "▼" : "▲"}
           </span>
-          <button style={{ ...S.bp, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 10px" : "5px 14px", position: "absolute", right: 16 }} onClick={(e) => { e.stopPropagation(); setShowProductForm("new"); }}>+ New</button>
+          <div style={{ position: "absolute", right: 16, display: "flex", gap: 6, alignItems: "center" }}>
+            {isSupabaseConfigured && (
+              <button
+                style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 8px" : "5px 10px", opacity: productsRefreshing ? 0.5 : 1 }}
+                onClick={(e) => { e.stopPropagation(); refreshProducts(); }}
+                title="Refresh product list from database"
+                disabled={productsRefreshing}
+              >{productsRefreshing ? "⟳" : "⟳"} {!isMobile && "Refresh"}</button>
+            )}
+            <button style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 10px" : "5px 14px" }} onClick={(e) => { e.stopPropagation(); setShowProductManager(true); }}>Manage</button>
+          </div>
         </div>
         {/* Pool content — always mounted so drag source elements stay in DOM */}
         <div style={{ flex: 1, overflowY: "auto", padding: "0 10px 10px", display: "flex", flexDirection: "column", gap: 6, visibility: drawerOpen ? "visible" : "hidden", pointerEvents: drawerOpen ? "auto" : "none" }}>
@@ -376,7 +401,18 @@ export default function App() {
         </div>
       </div>
 
-      {showProductForm && <ProductFormModal product={showProductForm === "new" ? null : showProductForm} onSave={handleProductSave} onClose={() => setShowProductForm(null)} />}
+      {slotPicker && (() => {
+        const pan = pans.find((p) => p.id === slotPicker.panId);
+        return pan ? (
+          <SlotPickerModal
+            pan={pan} slotIdx={slotPicker.slotIdx}
+            pans={pans} products={products}
+            onAssign={handleSlotPickerAssign}
+            onClose={() => setSlotPicker(null)}
+          />
+        ) : null;
+      })()}
+      {showProductManager && <ProductManagerModal products={products} onSave={handleProductSave} onDelete={deleteProduct} onClose={() => setShowProductManager(false)} />}
       {showAutoGen && <AutoGenModal products={products} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
       {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadPublicCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentPans={pans} currentCaseWidth={caseWidth} onClose={() => setShowSaved(false)} />}
