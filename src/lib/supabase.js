@@ -156,6 +156,8 @@ function rowToProduct(row) {
     deepShallow: row.deep_shallow,
     demand: row.demand,
     preferredPosition: row.preferred_position || "",
+    preferredZone: row.preferred_zone || "",
+    preferredSplit: row.preferred_split || "",
     labels: row.labels || [],
   };
 }
@@ -173,6 +175,8 @@ function productToRow(p) {
     deep_shallow: p.deepShallow,
     demand: p.demand,
     preferred_position: p.preferredPosition || "",
+    preferred_zone: p.preferredZone || "",
+    preferred_split: p.preferredSplit || "",
     labels: p.labels || [],
   };
 }

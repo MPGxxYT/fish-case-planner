@@ -13,6 +13,21 @@ export const PRODUCT_COLORS = {
 export const COOK_TYPES = ["Raw", "Cooked", "Unassigned"];
 export const FISH_TYPES = ["Finfish", "Shellfish", "Unassigned"];
 
+export const POSITION_ZONES = [
+  { key: "left",         label: "Left"   },
+  { key: "center-left",  label: "Ctr-L"  },
+  { key: "center",       label: "Center" },
+  { key: "center-right", label: "Ctr-R"  },
+  { key: "right",        label: "Right"  },
+];
+
+export const PREFERRED_SPLITS = [
+  { key: "",      label: "Auto"  },
+  { key: "full",  label: "Full"  },
+  { key: "half",  label: "Half"  },
+  { key: "third", label: "Third" },
+];
+
 export const PRODUCT_LABELS = [
   { key: "previously_frozen", label: "Previously Frozen", abbr: "PF",   color: "#93c5fd" },
   { key: "fresh",             label: "Fresh",             abbr: "Fr",   color: "#86efac" },

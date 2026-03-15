@@ -1,14 +1,14 @@
 import { useState, useMemo, useCallback } from "react";
-import { T, S, FONT, DFONT, PRODUCT_COLORS, COOK_TYPES, FISH_TYPES, PAN_WIDTHS, PRODUCT_LABELS } from "../utils/constants.js";
+import { T, S, FONT, DFONT, PRODUCT_COLORS, COOK_TYPES, FISH_TYPES, PAN_WIDTHS, PRODUCT_LABELS, POSITION_ZONES, PREFERRED_SPLITS } from "../utils/constants.js";
 import { uid, toProperCase } from "../utils/helpers.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import ConfirmDialog from "./ConfirmDialog.jsx";
 
 function blankProduct() {
-  return { id: uid(), name: "", plu: "", color: "cool", cookType: "Unassigned", fishType: "Unassigned", maxPan: 8, minPan: 3, deepShallow: "shallow", demand: 5, preferredPosition: "", labels: [] };
+  return { id: uid(), name: "", plu: "", color: "cool", cookType: "Unassigned", fishType: "Unassigned", maxPan: 8, minPan: 3, deepShallow: "shallow", demand: 5, preferredZone: "", preferredSplit: "", labels: [] };
 }
 
-const COMPARE_FIELDS = ["name", "plu", "color", "cookType", "fishType", "maxPan", "minPan", "deepShallow", "demand", "preferredPosition"];
+const COMPARE_FIELDS = ["name", "plu", "color", "cookType", "fishType", "maxPan", "minPan", "deepShallow", "demand", "preferredZone", "preferredSplit"];
 
 function Editor({ form, setForm, original, onSave, onCancel, onDelete, isNew, compact }) {
   const s = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -164,13 +164,69 @@ function Editor({ form, setForm, original, onSave, onCancel, onDelete, isNew, co
           </div>
         </div>
 
-        {/* Preferred position — hidden on compact to save space */}
-        {!compact && (
-          <label style={S.fl}>
-            Preferred Position <span style={{ color: T.textDim, textTransform: "none", fontSize: 9 }}>(optional)</span>
-            <input style={inp} value={form.preferredPosition || ""} onChange={(e) => s("preferredPosition", e.target.value)} placeholder="e.g. 2–3 from left" />
-          </label>
-        )}
+        {/* Zone */}
+        <div style={lbl}>
+          Zone <span style={{ color: T.textDim, textTransform: "none", fontSize: 9 }}>(optional)</span>
+          <div style={{ display: "flex", gap: compact ? 3 : 4, marginTop: 2 }}>
+            {POSITION_ZONES.map(({ key, label }) => (
+              <button key={key} onClick={() => s("preferredZone", form.preferredZone === key ? "" : key)} style={{
+                flex: 1, padding: compact ? "3px 2px" : "4px 4px", borderRadius: 4,
+                border: `1px solid ${form.preferredZone === key ? T.accent + "88" : T.border}`,
+                background: form.preferredZone === key ? T.accent + "22" : T.surfaceAlt,
+                color: form.preferredZone === key ? T.accent : T.textMuted,
+                cursor: "pointer", fontSize: compact ? 8 : 9, fontFamily: FONT, fontWeight: form.preferredZone === key ? 700 : 400,
+              }}>{label}</button>
+            ))}
+          </div>
+          {/* Case diagram */}
+          <div style={{ marginTop: 5, borderRadius: 4, overflow: "hidden", border: `1px solid ${T.border}` }}>
+            {/* Zone segments */}
+            <div style={{ display: "flex", height: compact ? 14 : 18 }}>
+              {POSITION_ZONES.map(({ key }, i) => {
+                const active = form.preferredZone === key;
+                return (
+                  <div
+                    key={key}
+                    onClick={() => s("preferredZone", form.preferredZone === key ? "" : key)}
+                    style={{
+                      flex: 1, cursor: "pointer",
+                      background: active ? T.accent + "44" : T.surfaceAlt,
+                      borderRight: i < POSITION_ZONES.length - 1 ? `1px solid ${T.border}` : "none",
+                      transition: "background 0.15s",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    {active && <div style={{ width: compact ? 10 : 14, height: compact ? 4 : 6, borderRadius: 2, background: T.accent, opacity: 0.9 }} />}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Labels */}
+            <div style={{ display: "flex", borderTop: `1px solid ${T.border}`, background: T.bg }}>
+              <div style={{ flex: 1, fontSize: 7, color: T.textDim, fontFamily: FONT, textAlign: "center", padding: "1px 0" }}>◄ Left</div>
+              <div style={{ flex: 1 }} />
+              <div style={{ flex: 1, fontSize: 7, color: T.textDim, fontFamily: FONT, textAlign: "center", padding: "1px 0" }}>Center</div>
+              <div style={{ flex: 1 }} />
+              <div style={{ flex: 1, fontSize: 7, color: T.textDim, fontFamily: FONT, textAlign: "center", padding: "1px 0" }}>Right ►</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Preferred Split */}
+        <div style={lbl}>
+          Preferred Split
+          <div style={{ display: "flex", gap: compact ? 3 : 4, marginTop: 2 }}>
+            {PREFERRED_SPLITS.map(({ key, label }) => (
+              <button key={key} onClick={() => s("preferredSplit", key)} style={{
+                flex: 1, padding: compact ? "3px 2px" : "4px 4px", borderRadius: 4,
+                border: `1px solid ${form.preferredSplit === key ? T.accent + "88" : T.border}`,
+                background: form.preferredSplit === key ? T.accent + "22" : T.surfaceAlt,
+                color: form.preferredSplit === key ? T.accent : T.textMuted,
+                cursor: "pointer", fontSize: compact ? 9 : 10, fontFamily: FONT, fontWeight: form.preferredSplit === key ? 700 : 400,
+              }}>{label}</button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Footer */}

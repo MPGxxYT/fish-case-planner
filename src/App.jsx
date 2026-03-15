@@ -20,7 +20,7 @@ import SlotPickerModal from "./components/SlotPickerModal.jsx";
 import ProductManagerModal from "./components/ProductManagerModal.jsx";
 
 const migrateColor = (c) => (c === "orange") ? "warm" : (c === "white" || c === "blue") ? "cool" : c;
-const migrateProducts = (ps) => ps.map((p) => ({ ...p, color: migrateColor(p.color), preferredPosition: p.preferredPosition || "", labels: p.labels || [] }));
+const migrateProducts = (ps) => ps.map((p) => ({ preferredZone: "", preferredSplit: "", ...p, color: migrateColor(p.color), preferredPosition: p.preferredPosition || "", labels: p.labels || [] }));
 
 export default function App() {
   // localStorage acts as a stale-while-revalidate cache for the Supabase products table.
@@ -28,6 +28,7 @@ export default function App() {
   const [products, setProducts] = useLocalStorage("fcp3_products", [], migrateProducts);
   const [pans, setPans] = useLocalStorage("fcp3_pans", []);
   const [caseWidth, setCaseWidth] = useLocalStorage("fcp3_cw", DEFAULT_CASE_WIDTH);
+  const [dividerList, setDividerList] = useLocalStorage("fcp3_dividers", []);
   const [savedCases, setSavedCases] = useLocalStorage("fcp3_sc", []);
   const [filters, setFilters] = useState({ color: "", cookType: "", fishType: "", deepShallow: "", sort: "name" });
   const [showProductManager, setShowProductManager] = useState(false);
@@ -75,6 +76,15 @@ export default function App() {
   const usedWidth = pans.reduce((s, p) => s + p.width, 0);
   const remainingWidth = caseWidth - usedWidth;
   const colorWarnings = useMemo(() => checkColorConflicts(pans, products), [pans, products]);
+
+  const dividers = useMemo(() => new Set(dividerList), [dividerList]);
+  const toggleDivider = (afterPanId) => {
+    setDividerList((prev) => {
+      const s = new Set(prev);
+      if (s.has(afterPanId)) s.delete(afterPanId); else s.add(afterPanId);
+      return [...s];
+    });
+  };
 
   const MAX_HISTORY = 20;
   const snapshotPans = () => {
@@ -170,14 +180,14 @@ export default function App() {
     if (!confirmExpand) return;
     if (confirmExpand.type === "resize") {
       const { panId, newWidth, newCaseWidth } = confirmExpand;
-      setCaseWidth(Math.min(150, newCaseWidth));
+      setCaseWidth(Math.min(208, newCaseWidth));
       applyPanWidth(panId, newWidth);
     } else {
       const { productId, insertIdx, product } = confirmExpand;
       const newPan = { id: uid(), width: product.minPan, depth: "full", panType: product.deepShallow, slots: { 0: productId } };
       const currentUsed = pans.reduce((s, p) => s + p.width, 0);
       snapshotPans();
-      setCaseWidth(Math.min(150, currentUsed + product.minPan));
+      setCaseWidth(Math.min(208, currentUsed + product.minPan));
       setPans((p) => { const a = [...p]; a.splice(insertIdx, 0, newPan); return a; });
     }
     setConfirmExpand(null);
@@ -301,7 +311,7 @@ export default function App() {
       <main style={{ padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? (drawerOpen ? "calc(58vh + 14px)" : 66) : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
-            Case:<input type="number" value={caseWidth} onChange={(e) => setCaseWidth(Math.min(150, Math.max(usedWidth, Math.max(1, +e.target.value))))} style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }} />
+            Case:<input type="number" value={caseWidth} onChange={(e) => setCaseWidth(Math.min(208, Math.max(usedWidth, Math.max(1, +e.target.value))))} style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }} />
           </label>
           <span style={{ fontSize: 11, fontFamily: FONT, padding: "3px 8px", borderRadius: 4, background: remainingWidth < 0 ? T.danger + "33" : T.accentDim + "33", color: remainingWidth < 0 ? T.danger : T.accent }}>
             {usedWidth}/{caseWidth} · {remainingWidth} left
@@ -333,6 +343,7 @@ export default function App() {
           isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
           selectedProductId={selectedProductId} onMobilePlaceProduct={handleMobilePlaceProduct}
           onPickProduct={handlePickProduct}
+          dividers={dividers} onToggleDivider={toggleDivider}
         />
 
         {colorWarnings.length > 0 && (
@@ -413,7 +424,7 @@ export default function App() {
         ) : null;
       })()}
       {showProductManager && <ProductManagerModal products={products} onSave={handleProductSave} onDelete={deleteProduct} onClose={() => setShowProductManager(false)} />}
-      {showAutoGen && <AutoGenModal products={products} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
+      {showAutoGen && <AutoGenModal products={products} savedCases={savedCases} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
       {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadPublicCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentPans={pans} currentCaseWidth={caseWidth} onClose={() => setShowSaved(false)} />}
       {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { snapshotPans(); setPans([]); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
