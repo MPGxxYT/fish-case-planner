@@ -4,10 +4,11 @@ import PanColumn from "./PanColumn.jsx";
 
 export const DIVIDER_COLOR = "#94a3b8";
 
-function InsertZone({ idx, hoverInsertIdx, setHoverInsertIdx, hoverDividerIdx, setHoverDividerIdx, panDragId, onCreatePanFromProduct, hasDivider, onToggleDivider }) {
+function InsertZone({ idx, hoverInsertIdx, setHoverInsertIdx, hoverDividerIdx, setHoverDividerIdx, panDragId, onCreatePanFromProduct, hasDivider, onToggleDivider, dividerEditMode }) {
   const isProductHover = hoverInsertIdx === idx;
   const isDividerHover = hoverDividerIdx === idx;
   const isPanDragging = !!panDragId;
+  const canToggleDivider = dividerEditMode && !isPanDragging;
 
   return (
     <div
@@ -17,6 +18,7 @@ function InsertZone({ idx, hoverInsertIdx, setHoverInsertIdx, hoverDividerIdx, s
         const dt = e.dataTransfer.types;
         if (isPanDragging) return;
         if (dt.includes("divider")) {
+          if (!dividerEditMode) return;
           e.preventDefault();
           e.stopPropagation();
           setHoverDividerIdx(idx);
@@ -36,9 +38,11 @@ function InsertZone({ idx, hoverInsertIdx, setHoverInsertIdx, hoverDividerIdx, s
       onDrop={(e) => {
         const dragType = e.dataTransfer.getData("dragType");
         if (dragType === "divider") {
-          e.preventDefault();
-          e.stopPropagation();
-          onToggleDivider();
+          if (dividerEditMode) {
+            e.preventDefault();
+            e.stopPropagation();
+            onToggleDivider();
+          }
         } else {
           const pid = e.dataTransfer.getData("productId");
           if (dragType === "product" && pid) {
@@ -50,15 +54,15 @@ function InsertZone({ idx, hoverInsertIdx, setHoverInsertIdx, hoverDividerIdx, s
         setHoverInsertIdx(null);
         setHoverDividerIdx(null);
       }}
-      onClick={() => { if (!isPanDragging) onToggleDivider(); }}
-      title={hasDivider ? "Click to remove divider" : "Drag a divider here, or click to toggle"}
+      onClick={() => { if (canToggleDivider) onToggleDivider(); }}
+      title={!dividerEditMode ? "Enable divider editing (tab below case) to add or remove dividers" : hasDivider ? "Click to remove divider" : "Drag a divider here, or click to toggle"}
       style={{
         width: hasDivider ? 8 : 6,
         minWidth: hasDivider ? 8 : 6,
         marginLeft: hasDivider ? -4 : -3,
         marginRight: hasDivider ? -4 : -3,
         position: "relative", zIndex: 5,
-        cursor: isPanDragging ? "copy" : "pointer",
+        cursor: isPanDragging ? "copy" : canToggleDivider ? "pointer" : "default",
       }}
     >
       {/* Existing divider bar */}
@@ -108,7 +112,7 @@ function getPanSummary(pans) {
   return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, isPortrait, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct, dividers = new Set(), onToggleDivider }) {
+export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, isPortrait, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct, dividers = new Set(), onToggleDivider, dividerEditMode = false, onToggleDividerEditMode }) {
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
   const [hoverInsertIdx, setHoverInsertIdx] = useState(null);
@@ -188,7 +192,7 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
             ) : (
               <>
                 {/* Insert zone before first pan */}
-                <InsertZone idx={0} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} hoverDividerIdx={hoverDividerIdx} setHoverDividerIdx={setHoverDividerIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} hasDivider={dividers.has("start")} onToggleDivider={() => onToggleDivider("start")} />
+                <InsertZone idx={0} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} hoverDividerIdx={hoverDividerIdx} setHoverDividerIdx={setHoverDividerIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} hasDivider={dividers.has("start")} onToggleDivider={() => onToggleDivider("start")} dividerEditMode={dividerEditMode} />
                 {pans.map((pan, i) => (
                   <span key={pan.id} style={{ display: "contents" }}>
                     <PanColumn
@@ -205,7 +209,7 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
                       onPickProduct={onPickProduct}
                     />
                     {/* Insert zone after each pan */}
-                    <InsertZone idx={i + 1} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} hoverDividerIdx={hoverDividerIdx} setHoverDividerIdx={setHoverDividerIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} hasDivider={dividers.has(pan.id)} onToggleDivider={() => onToggleDivider(pan.id)} />
+                    <InsertZone idx={i + 1} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} hoverDividerIdx={hoverDividerIdx} setHoverDividerIdx={setHoverDividerIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} hasDivider={dividers.has(pan.id)} onToggleDivider={() => onToggleDivider(pan.id)} dividerEditMode={dividerEditMode} />
                   </span>
                 ))}
                 {remainingWidth > 0 && (
@@ -239,9 +243,25 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
             )}
           </div>
 
-          {/* "Top Of Case" label below */}
-          <div style={{ textAlign: "center", marginTop: 4 }}>
+          {/* "Top Of Case" label below, with a small tab to toggle divider editing */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginTop: 4 }}>
             <span style={{ fontSize: 10, color: T.textDim, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 1 }}>Top Of Case</span>
+            {onToggleDividerEditMode && (
+              <button
+                type="button"
+                onClick={onToggleDividerEditMode}
+                title={dividerEditMode ? "Divider editing is on — tap gaps between pans to add/remove dividers. Tap to turn off." : "Turn on divider editing to add or remove dividers between pans"}
+                style={{
+                  position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
+                  display: "flex", alignItems: "center", gap: 4,
+                  fontSize: 9, padding: "3px 8px", borderRadius: 5, cursor: "pointer",
+                  fontFamily: FONT, fontWeight: 700, letterSpacing: 0.3,
+                  border: `1px solid ${dividerEditMode ? T.accent : T.border}`,
+                  background: dividerEditMode ? T.accent : T.surfaceAlt,
+                  color: dividerEditMode ? T.bg : T.textDim,
+                }}
+              >╫ {dividerEditMode ? "Editing" : "Dividers"}</button>
+            )}
           </div>
         </div>
 

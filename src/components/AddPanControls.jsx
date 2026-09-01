@@ -8,7 +8,7 @@ const KEY_WIDTH_MAP = { "3": 3, "6": 6, "8": 8, "0": 12 };
 const KEY_DEPTH_MAP = { q: "full", w: "half", e: "third" };
 const KEY_TYPE_MAP  = { r: "shallow", t: "deep" };
 
-export default function AddPanControls({ onAddPan, remainingWidth }) {
+export default function AddPanControls({ onAddPan, remainingWidth, dividerEditMode = false }) {
   const [w, setW] = useState(6);
   const [d, setD] = useState("full");
   const [pt, setPt] = useState("shallow");
@@ -83,10 +83,10 @@ export default function AddPanControls({ onAddPan, remainingWidth }) {
           </button>
         )}
         <div
-          draggable
-          onDragStart={(e) => { e.dataTransfer.setData("dragType", "divider"); e.dataTransfer.setData("divider", "1"); }}
-          title="Drag into the case to place a divider"
-          style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 5, border: `1px solid ${T.border}`, background: T.surface, cursor: "grab", userSelect: "none" }}
+          draggable={dividerEditMode}
+          onDragStart={(e) => { if (!dividerEditMode) { e.preventDefault(); return; } e.dataTransfer.setData("dragType", "divider"); e.dataTransfer.setData("divider", "1"); }}
+          title={dividerEditMode ? "Drag into the case to place a divider" : "Turn on divider editing (tab below the case) to place dividers"}
+          style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 5, border: `1px solid ${T.border}`, background: T.surface, cursor: dividerEditMode ? "grab" : "not-allowed", userSelect: "none", opacity: dividerEditMode ? 1 : 0.4 }}
         >
           <div style={{ width: 3, height: 18, background: DIVIDER_COLOR, borderRadius: 1, flexShrink: 0 }} />
           <span style={{ fontSize: 10, color: T.textDim, fontFamily: FONT }}>Divider</span>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { T, S, FONT, DFONT, DEFAULT_CASE_WIDTH } from "./utils/constants.js";
 import { uid, canSplitDepth } from "./utils/helpers.js";
 import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
@@ -28,9 +28,12 @@ export default function App() {
   const [products, setProducts] = useLocalStorage("fcp3_products", [], migrateProducts);
   const [pans, setPans] = useLocalStorage("fcp3_pans", []);
   const [caseWidth, setCaseWidth] = useLocalStorage("fcp3_cw", DEFAULT_CASE_WIDTH);
+  const [caseWidthDraft, setCaseWidthDraft] = useState(String(caseWidth));
+  const caseWidthFocused = useRef(false);
   const [dividerList, setDividerList] = useLocalStorage("fcp3_dividers", []);
+  const [dividerEditMode, setDividerEditMode] = useState(false);
   const [savedCases, setSavedCases] = useLocalStorage("fcp3_sc", []);
-  const [filters, setFilters] = useState({ color: "", cookType: "", fishType: "", deepShallow: "", sort: "name" });
+  const [filters, setFilters] = useState({ color: "", cookType: "", fishType: "", deepShallow: "", sort: "name", hideInCase: false });
   const [showProductManager, setShowProductManager] = useState(false);
   const [showAutoGen, setShowAutoGen] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
@@ -77,6 +80,12 @@ export default function App() {
   const remainingWidth = caseWidth - usedWidth;
   const colorWarnings = useMemo(() => checkColorConflicts(pans, products), [pans, products]);
 
+  const productsInCase = useMemo(() => {
+    const s = new Set();
+    pans.forEach((pan) => Object.values(pan.slots).forEach((id) => { if (id) s.add(id); }));
+    return s;
+  }, [pans]);
+
   const dividers = useMemo(() => new Set(dividerList), [dividerList]);
   const toggleDivider = (afterPanId) => {
     setDividerList((prev) => {
@@ -84,6 +93,19 @@ export default function App() {
       if (s.has(afterPanId)) s.delete(afterPanId); else s.add(afterPanId);
       return [...s];
     });
+  };
+
+  // Case-width input: keep the raw text decoupled from the committed/clamped
+  // value so clamping mid-typing (e.g. to the width already used by pans)
+  // can't stomp on keystrokes before the user finishes typing.
+  useEffect(() => {
+    if (!caseWidthFocused.current) setCaseWidthDraft(String(caseWidth));
+  }, [caseWidth]);
+  const commitCaseWidth = (raw) => {
+    const n = parseInt(raw, 10);
+    const clamped = Number.isFinite(n) ? Math.min(208, Math.max(usedWidth, Math.max(1, n))) : caseWidth;
+    setCaseWidth(clamped);
+    setCaseWidthDraft(String(clamped));
   };
 
   const MAX_HISTORY = 20;
@@ -286,7 +308,7 @@ export default function App() {
 
   // Close drawer immediately at touchstart — safe because ProductPool stays mounted (CSS-only hide)
   const poolStartTouchDrag = (e, dragInfo, sourceEl) => { setDrawerOpen(false); startTouchDrag(e, dragInfo, sourceEl); };
-  const poolProps = { products, filters, setFilters, startTouchDrag: poolStartTouchDrag, isMobile, selectedProductId, onSelectProduct: handleSelectProduct };
+  const poolProps = { products, filters, setFilters, startTouchDrag: poolStartTouchDrag, isMobile, selectedProductId, onSelectProduct: handleSelectProduct, productsInCase };
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: DFONT }}>
@@ -311,7 +333,15 @@ export default function App() {
       <main style={{ padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? (drawerOpen ? "calc(58vh + 14px)" : 66) : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
-            Case:<input type="number" value={caseWidth} onChange={(e) => setCaseWidth(Math.min(208, Math.max(usedWidth, Math.max(1, +e.target.value))))} style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }} />
+            Case:<input
+              type="number"
+              value={caseWidthDraft}
+              onFocus={() => { caseWidthFocused.current = true; }}
+              onChange={(e) => setCaseWidthDraft(e.target.value)}
+              onBlur={(e) => { caseWidthFocused.current = false; commitCaseWidth(e.target.value); }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+              style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }}
+            />
           </label>
           <span style={{ fontSize: 11, fontFamily: FONT, padding: "3px 8px", borderRadius: 4, background: remainingWidth < 0 ? T.danger + "33" : T.accentDim + "33", color: remainingWidth < 0 ? T.danger : T.accent }}>
             {usedWidth}/{caseWidth} · {remainingWidth} left
@@ -330,7 +360,7 @@ export default function App() {
           <button style={{ ...S.ch, opacity: pansRedo.length === 0 ? 0.35 : 1 }} disabled={pansRedo.length === 0} onClick={handleRedo}>↪ Redo</button>
         </div>
 
-        <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} />
+        <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} dividerEditMode={dividerEditMode} />
 
         <CaseGrid
           pans={pans} products={products} caseWidth={caseWidth}
@@ -344,6 +374,7 @@ export default function App() {
           selectedProductId={selectedProductId} onMobilePlaceProduct={handleMobilePlaceProduct}
           onPickProduct={handlePickProduct}
           dividers={dividers} onToggleDivider={toggleDivider}
+          dividerEditMode={dividerEditMode} onToggleDividerEditMode={() => setDividerEditMode((v) => !v)}
         />
 
         {colorWarnings.length > 0 && (

@@ -1,13 +1,13 @@
 import { useState, useMemo } from "react";
 import { T, S, FONT, PRODUCT_COLORS, COOK_TYPES, FISH_TYPES, PRODUCT_LABELS } from "../utils/constants.js";
 
-const SORT_LABEL = { name: "Name", demand: "Demand", color: "Color", type: "Type" };
+const SORT_LABEL = { name: "Name", demand: "Demand", color: "Color", type: "Type", next: "Next Pick" };
 
-export default function ProductPool({ products, filters, setFilters, startTouchDrag, isMobile, selectedProductId, onSelectProduct }) {
+export default function ProductPool({ products, filters, setFilters, startTouchDrag, isMobile, selectedProductId, onSelectProduct, productsInCase = new Set() }) {
   const [search, setSearch] = useState("");
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
   const [showSortPanel, setShowSortPanel] = useState(false);
-  const activeFilterCount = [filters.color, filters.cookType, filters.fishType, filters.deepShallow].filter(Boolean).length;
+  const activeFilterCount = [filters.color, filters.cookType, filters.fishType, filters.deepShallow].filter(Boolean).length + (filters.hideInCase ? 1 : 0);
 
   const filtered = useMemo(() => {
     let l = [...products];
@@ -16,13 +16,23 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
     if (filters.cookType) l = l.filter((p) => p.cookType === filters.cookType);
     if (filters.fishType) l = l.filter((p) => p.fishType === filters.fishType);
     if (filters.deepShallow) l = l.filter((p) => p.deepShallow === filters.deepShallow);
+    if (filters.hideInCase) l = l.filter((p) => !productsInCase.has(p.id));
     const sk = filters.sort || "name";
-    l.sort((a, b) =>
-      sk === "name" ? a.name.localeCompare(b.name)
-      : sk === "demand" ? b.demand - a.demand
-      : sk === "color" ? a.color.localeCompare(b.color)
-      : a.fishType.localeCompare(b.fishType)
-    );
+    l.sort((a, b) => {
+      if (sk === "next") {
+        // Products not yet in the case, highest demand first — those are the
+        // most likely candidates for the next slot. Already-placed products
+        // sink to the bottom (still ranked by demand among themselves).
+        const aIn = productsInCase.has(a.id) ? 1 : 0;
+        const bIn = productsInCase.has(b.id) ? 1 : 0;
+        if (aIn !== bIn) return aIn - bIn;
+        return b.demand - a.demand;
+      }
+      return sk === "name" ? a.name.localeCompare(b.name)
+        : sk === "demand" ? b.demand - a.demand
+        : sk === "color" ? a.color.localeCompare(b.color)
+        : a.fishType.localeCompare(b.fishType);
+    });
     // When searching, promote exact and prefix matches above substring matches
     if (search) {
       const sq = search.toLowerCase();
@@ -33,7 +43,7 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
       });
     }
     return l;
-  }, [products, search, filters]);
+  }, [products, search, filters, productsInCase]);
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0 }}>
@@ -57,6 +67,19 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
       </div>
       {showFiltersPanel && (
         <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <button
+            type="button"
+            onClick={() => setFilters((f) => ({ ...f, hideInCase: !f.hideInCase }))}
+            style={{
+              display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 4, fontSize: 10, fontFamily: FONT, cursor: "pointer", textAlign: "left",
+              border: `1px solid ${filters.hideInCase ? T.accent + "66" : T.border}`,
+              background: filters.hideInCase ? T.accent + "22" : T.surfaceAlt,
+              color: filters.hideInCase ? T.accent : T.text,
+            }}
+          >
+            <span>{filters.hideInCase ? "☑" : "☐"}</span>
+            Hide products already in the case
+          </button>
           <div style={{ display: "flex", gap: 3 }}>
             <select style={S.sel} value={filters.color || ""} onChange={(e) => setFilters((f) => ({ ...f, color: e.target.value || "" }))}>
               <option value="">All Colors</option>
@@ -81,14 +104,14 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
         </div>
       )}
       {showSortPanel && (
-        <div style={{ display: "flex", gap: 3 }}>
-          {[["name", "Name"], ["demand", "Demand"], ["color", "Color"], ["type", "Type"]].map(([k, l]) => (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+          {[["name", "Name"], ["demand", "Demand"], ["next", "Next Pick"], ["color", "Color"], ["type", "Type"]].map(([k, l]) => (
             <button
               key={k}
               type="button"
               onClick={() => { setFilters((f) => ({ ...f, sort: k })); setShowSortPanel(false); }}
               style={{
-                flex: 1, padding: "4px 2px", borderRadius: 4, fontSize: 10, fontFamily: FONT, cursor: "pointer",
+                flex: "1 1 30%", minWidth: 70, padding: "4px 2px", borderRadius: 4, fontSize: 10, fontFamily: FONT, cursor: "pointer",
                 border: `1px solid ${(filters.sort || "name") === k ? T.accent + "66" : T.border}`,
                 background: (filters.sort || "name") === k ? T.accent + "22" : T.surfaceAlt,
                 color: (filters.sort || "name") === k ? T.accent : T.text,
