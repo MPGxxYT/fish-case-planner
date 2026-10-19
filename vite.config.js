@@ -8,4 +8,8 @@ export default defineConfig({
   server: {
     proxy: { '/api': 'http://localhost:8787' },
   },
+  // api/ has its own tests on Node's runner (npm run test:api).
+  test: {
+    include: ['src/**/*.test.js'],
+  },
 });

@@ -3,8 +3,6 @@ export const toProperCase = (s) =>
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
-export const canSplitDepth = (w) => w === 3 || w === 6;
-
 export const getDepthSlots = (d) =>
   d === "half" ? [0, 1] : d === "third" ? [0, 1, 2] : [0];
 

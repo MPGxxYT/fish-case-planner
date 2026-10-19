@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { T, FONT, PAN_WIDTHS } from "../utils/constants.js";
-import { getDepthSlots, canSplitDepth } from "../utils/helpers.js";
+import { getDepthSlots } from "../utils/helpers.js";
+import { canSplitDepth } from "../case/layout.js";
 import PanSlot from "./PanSlot.jsx";
 
 const DEPTH_OPTIONS = [
@@ -9,7 +10,7 @@ const DEPTH_OPTIONS = [
   { key: "third", label: "Third" },
 ];
 
-export default function PanColumn({ pan, products, onAssignProduct, onClearSlot, onDirectClearSlot, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, startTouchDrag, isMobile, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
+export default function PanColumn({ pan, products, onAssignProduct, onClearSlot, onMoveProduct, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, startTouchDrag, isMobile, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
   const ds = getDepthSlots(pan.depth);
   const isSplit = pan.depth !== "full";
   const maxAllowed = (remainingWidth || 0) + pan.width;
@@ -166,7 +167,7 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
           {ds.map((idx) => (
             <PanSlot
               key={idx} pan={pan} slotIdx={idx} products={products}
-              onAssignProduct={onAssignProduct} onClearSlot={onClearSlot} onDirectClearSlot={onDirectClearSlot}
+              onAssignProduct={onAssignProduct} onClearSlot={onClearSlot} onMoveProduct={onMoveProduct}
               onSetSlotType={onSetSlotType}
               totalDepthSlots={ds.length}
               startTouchDrag={startTouchDrag}

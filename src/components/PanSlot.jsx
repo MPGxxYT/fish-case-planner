@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { T, FONT, DFONT, PRODUCT_COLORS, DEPTH_UNITS, CASE_DEPTH, PRODUCT_LABELS } from "../utils/constants.js";
 import { getSlotLabel } from "../utils/helpers.js";
 
-export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onClearSlot, onDirectClearSlot, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
+export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onClearSlot, onMoveProduct, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
   const [dOver, setDOver] = useState(false);
   const slotRef = useRef();
   const product = pan.slots[slotIdx] ? products.find((p) => p.id === pan.slots[slotIdx]) : null;
@@ -54,10 +54,7 @@ export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onCle
         } else if (dt === "slotProduct" && pid) {
           const sPan = e.dataTransfer.getData("srcPanId");
           const sIdx = +e.dataTransfer.getData("srcSlotIdx");
-          const cur = pan.slots[slotIdx];
-          onAssignProduct(pan.id, slotIdx, pid);
-          if (cur) onAssignProduct(sPan, sIdx, cur);
-          else onDirectClearSlot(sPan, sIdx);
+          onMoveProduct({ panId: sPan, slot: sIdx }, { panId: pan.id, slot: slotIdx });
         }
       }}
       style={{
