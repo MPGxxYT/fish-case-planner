@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { T, FONT, PRODUCT_COLORS, DEPTH_UNITS, CASE_DEPTH } from "../utils/constants.js";
+import { usedWidth as sumWidth } from "../case/layout.js";
 import { getDepthSlots } from "../utils/helpers.js";
 
 function getPanSummary(pans) {
@@ -14,7 +15,7 @@ function getPanSummary(pans) {
 export { getPanSummary };
 
 export default function CasePreview({ pans, products, caseWidth, height = 220 }) {
-  const usedWidth = pans.reduce((s, p) => s + p.width, 0);
+  const usedWidth = sumWidth(pans);
   const summary = useMemo(() => getPanSummary(pans), [pans]);
   const getSlotType = (pan, idx) => pan.slotTypes?.[idx] ?? pan.panType;
 

@@ -34,3 +34,7 @@ A Saved Case shared to the server under a short code so coworkers can load it.
 
 **Product**:
 A catalog item (a fish or shellfish offering) that can be assigned to Slots.
+
+**Color clash**:
+Two Products of the same Warm or Red color in Slots that touch across neighboring Pans. Cool Products never clash. Slots touch when their front-to-back spans overlap.
+_Avoid_: Color conflict, adjacency warning

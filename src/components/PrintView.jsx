@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
 import { T, S, DFONT, FONT, PRODUCT_COLORS, DEPTH_UNITS, CASE_DEPTH } from "../utils/constants.js";
+import { usedWidth as sumWidth } from "../case/layout.js";
 import { getDepthSlots } from "../utils/helpers.js";
 import CasePreview, { getPanSummary } from "./CasePreview.jsx";
 
 export default function PrintView({ pans, products, caseWidth, onClose }) {
   const [title, setTitle] = useState(`Fish Case — ${caseWidth} units`);
-  const usedWidth = pans.reduce((s, p) => s + p.width, 0);
+  const usedWidth = sumWidth(pans);
   const summary = useMemo(() => getPanSummary(pans), [pans]);
 
   const getSlotType = (pan, idx) => pan.slotTypes?.[idx] ?? pan.panType;

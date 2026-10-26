@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { T, S, FONT, DFONT } from "./utils/constants.js";
+import { T, S, FONT, DFONT, PRODUCT_COLORS } from "./utils/constants.js";
 import { checkFit, clampCaseWidth, usedWidth as sumWidth } from "./case/layout.js";
 import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
 import { fetchPublicProducts, upsertPublicProduct, deletePublicProduct } from "./lib/api.js";
 import { autoGenerateCase } from "./utils/autoGenerate.js";
-import { checkColorConflicts } from "./utils/colorConflicts.js";
+import { colorClashes, indexProducts, productsInCase as placedIds } from "./case/queries.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useLayout } from "./hooks/useLayout.js";
 import { useCaseDrag } from "./hooks/useCaseDrag.js";
@@ -76,13 +76,11 @@ export default function App() {
 
   const usedWidth = sumWidth(pans);
   const remainingWidth = caseWidth - usedWidth;
-  const colorWarnings = useMemo(() => checkColorConflicts(pans, products), [pans, products]);
+  const colorWarnings = useMemo(() => colorClashes(pans, indexProducts(products)).map(({ a, b }) =>
+    `"${a.product.name}" and "${b.product.name}" are side by side, both ${PRODUCT_COLORS[a.product.color]?.label || a.product.color}`
+  ), [pans, products]);
 
-  const productsInCase = useMemo(() => {
-    const s = new Set();
-    pans.forEach((pan) => Object.values(pan.slots).forEach((id) => { if (id) s.add(id); }));
-    return s;
-  }, [pans]);
+  const productsInCase = useMemo(() => placedIds(pans), [pans]);
 
   const dividers = useMemo(() => new Set(layout.dividers), [layout.dividers]);
   const toggleDivider = (afterPanId) => dispatch({ type: "toggleDivider", afterPanId });

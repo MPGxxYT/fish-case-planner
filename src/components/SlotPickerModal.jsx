@@ -1,8 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { T, S, FONT, DFONT, PRODUCT_COLORS, COOK_TYPES, FISH_TYPES } from "../utils/constants.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
-
-const isWarmGroup = (c) => c === "warm" || c === "red";
+import { productsInCase, neighbourSlots, colorsClash } from "../case/queries.js";
 
 function relevanceScore(name, sq) {
   const n = name.toLowerCase();
@@ -25,30 +24,16 @@ export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign
   useEffect(() => { searchRef.current?.focus(); }, []);
 
   // Products already placed anywhere in the case (excluding the current slot)
-  const inTheCase = useMemo(() => {
-    const ids = new Set();
-    for (const p of pans) {
-      Object.entries(p.slots).forEach(([k, v]) => {
-        if (v && !(p.id === pan.id && +k === slotIdx)) ids.add(v);
-      });
-    }
-    return ids;
-  }, [pans, pan, slotIdx]);
+  const inTheCase = useMemo(() => productsInCase(pans, { except: { panId: pan.id, slot: slotIdx } }), [pans, pan, slotIdx]);
 
-  // Colors of products in adjacent pans
-  const adjacentWarmColors = useMemo(() => {
-    const panIdx = pans.findIndex((p) => p.id === pan.id);
-    const colorSet = new Set();
-    [-1, 1].forEach((offset) => {
-      const adj = pans[panIdx + offset];
-      if (!adj) return;
-      Object.values(adj.slots).forEach((pid) => {
-        const p = products.find((x) => x.id === pid);
-        if (p && isWarmGroup(p.color)) colorSet.add(p.color);
-      });
-    });
-    return colorSet;
-  }, [pan, pans, products]);
+  // Products in the slots that touch this one, for the color separation rule
+  const neighbours = useMemo(() => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return neighbourSlots(pans, pan.id, slotIdx)
+      .map(({ panId, slot }) => byId.get(pans.find((p) => p.id === panId).slots[slot]))
+      .filter(Boolean);
+  }, [pan, pans, products, slotIdx]);
+  const clashesNearby = (p) => neighbours.some((n) => colorsClash(p, n));
 
   const filtered = useMemo(() => {
     const sq = search.toLowerCase().trim();
@@ -68,8 +53,8 @@ export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign
         const bp = inTheCase.has(b.id) ? 1 : 0;
         if (ap !== bp) return ap - bp;
         // 3. Color conflict with adjacent pan → mild downrank
-        const ac = isWarmGroup(a.color) && adjacentWarmColors.size > 0 && adjacentWarmColors.has(a.color) ? 1 : 0;
-        const bc = isWarmGroup(b.color) && adjacentWarmColors.size > 0 && adjacentWarmColors.has(b.color) ? 1 : 0;
+        const ac = clashesNearby(a) ? 1 : 0;
+        const bc = clashesNearby(b) ? 1 : 0;
         if (ac !== bc) return ac - bc;
         // 4. Higher demand first
         return b.demand - a.demand;
@@ -85,7 +70,7 @@ export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign
     }
 
     return l;
-  }, [products, search, sort, filterColor, filterFishType, inTheCase, adjacentWarmColors, pan]);
+  }, [products, search, sort, filterColor, filterFishType, inTheCase, neighbours, pan]);
 
   const activeFilters = [filterColor, filterFishType].filter(Boolean).length;
 
@@ -95,7 +80,7 @@ export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign
       {filtered.map((p) => {
         const col = PRODUCT_COLORS[p.color];
         const isInCase = inTheCase.has(p.id);
-        const hasConflict = isWarmGroup(p.color) && adjacentWarmColors.has(p.color);
+        const hasConflict = clashesNearby(p);
         const doesntFit = p.minPan > pan.width;
         return (
           <button
