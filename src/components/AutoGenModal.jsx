@@ -3,6 +3,7 @@ import { T, S, DFONT, FONT, DEFAULT_CASE_WIDTH, PRODUCT_COLORS, FISH_TYPES } fro
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { fetchCaseByCode } from "../lib/api.js";
 import { estimateTotalWidth } from "../utils/autoGenerate.js";
+import { productsInCase } from "../case/queries.js";
 
 // ── Available product row ─────────────────────────────────────────────────────
 
@@ -116,10 +117,7 @@ export default function AutoGenModal({ products, savedCases = [], onGenerate, on
   const toggleSale = (id) => setSel((s) => ({ ...s, [id]: { ...s[id], onSale: !s[id]?.onSale } }));
 
   const importFromCase = (caseObj) => {
-    const ids = new Set();
-    for (const pan of caseObj.pans)
-      for (const pid of Object.values(pan.slots))
-        if (pid) ids.add(pid);
+    const ids = productsInCase(caseObj.pans);
     const newSel = {};
     for (const p of products) if (ids.has(p.id)) newSel[p.id] = { onSale: false };
     setSel(newSel);

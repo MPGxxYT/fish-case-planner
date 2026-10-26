@@ -1,14 +1,10 @@
+import { placedProducts } from "../case/queries.js";
+
 const FILE_VERSION = 1;
 const FILE_EXT = ".fishcase";
 
 export const exportCaseToFile = (savedCase, products) => {
-  const usedProductIds = new Set();
-  for (const pan of savedCase.pans) {
-    for (const pid of Object.values(pan.slots)) {
-      if (pid) usedProductIds.add(pid);
-    }
-  }
-  const usedProducts = products.filter((p) => usedProductIds.has(p.id));
+  const usedProducts = placedProducts(savedCase.pans, products);
 
   const payload = {
     version: FILE_VERSION,

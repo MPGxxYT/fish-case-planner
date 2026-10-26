@@ -1,8 +1,7 @@
+import { colorsClash } from "../case/queries.js";
 import { PAN_WIDTHS } from "./constants.js";
 import { uid } from "./helpers.js";
 
-const isWarm = (c) => c === "warm" || c === "red";
-const sameWarm = (a, b) => isWarm(a.color) && isWarm(b.color) && a.color === b.color;
 const effDemand = (item) => item.product.demand + (item.onSale ? 4 : 0);
 
 // Widths valid for split pans (only 3 and 6 can be split)
@@ -68,9 +67,9 @@ function arrangePanUnits(units) {
 
   // Color alternation: greedy swap to fix same-warm adjacency
   for (let i = 0; i < arranged.length - 1; i++) {
-    if (sameWarm(arranged[i], arranged[i + 1])) {
+    if (colorsClash(arranged[i], arranged[i + 1])) {
       for (let j = i + 2; j < arranged.length; j++) {
-        if (!sameWarm(arranged[i], arranged[j])) {
+        if (!colorsClash(arranged[i], arranged[j])) {
           [arranged[i + 1], arranged[j]] = [arranged[j], arranged[i + 1]];
           break;
         }

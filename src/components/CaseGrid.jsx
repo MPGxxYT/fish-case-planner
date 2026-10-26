@@ -1,5 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { T, FONT } from "../utils/constants.js";
+import { usedWidth as sumWidth } from "../case/layout.js";
 import PanColumn from "./PanColumn.jsx";
 
 export const DIVIDER_COLOR = "#94a3b8";
@@ -135,7 +136,7 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
     prevCaseWidthRef.current = caseWidth;
   }, [caseWidth, isMobile]);
 
-  const usedWidth = pans.reduce((s, p) => s + p.width, 0);
+  const usedWidth = sumWidth(pans);
   const remainingWidth = caseWidth - usedWidth;
   // On mobile, enforce a minimum pixel size per unit so the case scrolls rather than shrinks
   const minUnit = isMobile ? 8 : 3;

@@ -1,6 +1,7 @@
 // Published cases and the shared product catalog, stored by the API in
 // api/. In development Vite forwards /api to `npm run dev:api`; on the
 // server nginx does.
+import { placedProducts } from "../case/queries.js";
 
 async function request(method, path, body) {
   let res;
@@ -18,18 +19,9 @@ async function request(method, path, body) {
   return data;
 }
 
-function getUsedProducts(pans, products) {
-  const usedIds = new Set();
-  for (const pan of pans) {
-    for (const pid of Object.values(pan.slots)) {
-      if (pid) usedIds.add(pid);
-    }
-  }
-  return products.filter((p) => usedIds.has(p.id));
-}
 
 export function publishCase(name, author, pans, products, caseWidth) {
-  return request("POST", "/cases", { name, author: author || "", caseWidth, pans, products: getUsedProducts(pans, products) });
+  return request("POST", "/cases", { name, author: author || "", caseWidth, pans, products: placedProducts(pans, products) });
 }
 
 export function fetchPublicCases(page = 0, search = "") {
@@ -46,7 +38,7 @@ export async function deletePublicCase(shortCode) {
 }
 
 export async function updatePublicCase(shortCode, pans, products, caseWidth) {
-  await request("PUT", `/cases/${encodeURIComponent(shortCode)}`, { caseWidth, pans, products: getUsedProducts(pans, products) });
+  await request("PUT", `/cases/${encodeURIComponent(shortCode)}`, { caseWidth, pans, products: placedProducts(pans, products) });
 }
 
 // ─── Shared Product Catalog ───────────────────────────────────────────────────
