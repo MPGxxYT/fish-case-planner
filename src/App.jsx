@@ -353,7 +353,7 @@ export default function App() {
       {confirmClear && <ConfirmDialog message={pans.length === 1 ? "Clear the only pan from the case? Undo brings it back." : `Clear all ${pans.length} pans from the case? Undo brings them back.`} onConfirm={() => { replaceLayout([], caseWidth); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear case" />}
       {confirmExpand && <ConfirmDialog
         message={confirmExpand.edit.type === "resizePan"
-          ? `A ${confirmExpand.edit.width}-wide pan won't fit. Grow the case from ${caseWidth} to ${confirmExpand.requiredWidth} units?`
+          ? `${confirmExpand.edit.width === 8 ? "An" : "A"} ${confirmExpand.edit.width}-wide pan won't fit. Grow the case from ${caseWidth} to ${confirmExpand.requiredWidth} units?`
           : `${confirmExpand.product.name} needs ${confirmExpand.product.minPan} units and only ${remainingWidth} are left. Add it and grow the case from ${caseWidth} to ${confirmExpand.requiredWidth} units?`}
         onConfirm={confirmExpandAction}
         onCancel={() => setConfirmExpand(null)}
