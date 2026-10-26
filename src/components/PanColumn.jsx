@@ -11,7 +11,7 @@ const DEPTH_OPTIONS = [
   { key: "third", label: "Third" },
 ];
 
-export default function PanColumn({ pan, products, onDrop, onClearSlot, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, drag, startTouchDrag, isMobile, selectedProductId, onPickProduct }) {
+export default function PanColumn({ pan, products, onDrop, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, drag, startTouchDrag, isMobile, selectedProductId, onPickProduct }) {
   const ds = getDepthSlots(pan.depth);
   const isSplit = pan.depth !== "full";
   const maxAllowed = (remainingWidth || 0) + pan.width;
@@ -168,7 +168,7 @@ export default function PanColumn({ pan, products, onDrop, onClearSlot, unitSize
           {ds.map((idx) => (
             <PanSlot
               key={idx} pan={pan} slotIdx={idx} products={products}
-              onDrop={onDrop} onClearSlot={onClearSlot}
+              onDrop={onDrop}
               onSetSlotType={onSetSlotType}
               totalDepthSlots={ds.length}
               startTouchDrag={startTouchDrag}

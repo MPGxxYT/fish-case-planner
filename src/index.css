@@ -38,8 +38,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* The case is the only thing that scrolls sideways. A long press on a Slot or
+   Pan header starts a drag, so it must not select text or open a callout. */
 .case-container {
-  touch-action: pan-x;
+  touch-action: pan-x pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 body.touch-dragging {

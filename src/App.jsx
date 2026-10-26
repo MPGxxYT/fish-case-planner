@@ -40,12 +40,31 @@ export default function App() {
   const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
-  const [clearSlotConfirm, setClearSlotConfirm] = useState(null);
   const [confirmExpand, setConfirmExpand] = useState(null); // { edit, requiredWidth, product? }
-  const [confirmRemovePan, setConfirmRemovePan] = useState(null);
   const [slotPicker, setSlotPicker] = useState(null); // { panId, slotIdx }
-  const [toast, setToast] = useState(null);
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast((t) => t === msg ? null : t), 2000); };
+  const [toast, setToast] = useState(null); // { msg, undoable }
+  const showToast = (msg, { undoable = false } = {}) => {
+    const t = { msg, undoable };
+    setToast(t);
+    setTimeout(() => setToast((cur) => cur === t ? null : cur), undoable ? 5000 : 2000);
+  };
+
+  // Routine removals happen at once and offer Undo in a toast instead of asking first.
+  // The toast's Undo only applies while the removal is still the latest edit.
+  const undoToastLayout = useRef(null);
+  const editWithUndo = (edit, msg) => {
+    undoToastLayout.current = "pending";
+    dispatch(edit);
+    showToast(msg, { undoable: true });
+  };
+  useEffect(() => {
+    if (undoToastLayout.current === "pending") { undoToastLayout.current = layout; return; }
+    if (undoToastLayout.current && undoToastLayout.current !== layout) {
+      undoToastLayout.current = null;
+      setToast((t) => t?.undoable ? null : t);
+    }
+  }, [layout]);
+  const undoFromToast = () => { undo(); setToast(null); };
 
   const refreshProducts = () => {
     if (catalog.refreshing) return;
@@ -96,18 +115,19 @@ export default function App() {
   };
 
   const addPan = (width, depth, panType) => dispatch({ type: "addPan", width, depth, panType });
-  const handleRemovePanClick = (id) => setConfirmRemovePan(id);
-  const confirmRemovePanAction = () => { dispatch({ type: "removePan", panId: confirmRemovePan }); setConfirmRemovePan(null); };
+  const handleRemovePanClick = (id) => {
+    const pan = pans.find((p) => p.id === id);
+    editWithUndo({ type: "removePan", panId: id }, pan ? `Removed ${pan.width}-wide pan` : "Removed pan");
+  };
   const setPanType = (panId, panType) => dispatch({ type: "setPanType", panId, panType });
   const setSlotType = (panId, slot, panType) => dispatch({ type: "setSlotType", panId, slot, panType });
   const setPanWidth = (panId, width) => dispatchOrConfirmExpand({ type: "resizePan", panId, width });
   const setPanDepth = (panId, depth) => dispatch({ type: "setPanDepth", panId, depth });
   const assignProduct = (panId, slot, productId) => dispatch({ type: "assignProduct", panId, slot, productId });
-  const clearSlot = (panId, slotIdx) => setClearSlotConfirm({ panId, slotIdx });
-  const confirmClearSlotAction = () => {
-    if (!clearSlotConfirm) return;
-    dispatch({ type: "clearSlot", panId: clearSlotConfirm.panId, slot: clearSlotConfirm.slotIdx });
-    setClearSlotConfirm(null);
+  const clearSlot = (panId, slotIdx) => {
+    const id = pans.find((p) => p.id === panId)?.slots[slotIdx];
+    const name = products.find((p) => p.id === id)?.name;
+    editWithUndo({ type: "clearSlot", panId, slot: slotIdx }, name ? `Removed ${name}` : "Removed product");
   };
   const replaceLayout = (newPans, newCaseWidth, dividers = []) => dispatch({ type: "replaceLayout", pans: newPans, caseWidth: newCaseWidth, dividers });
 
@@ -187,7 +207,7 @@ export default function App() {
   };
 
   // Close drawer immediately at touchstart — safe because ProductPool stays mounted (CSS-only hide)
-  const poolStartTouchDrag = (e, dragInfo, sourceEl) => { setDrawerOpen(false); startTouchDrag(e, dragInfo, sourceEl); };
+  const poolStartTouchDrag = (e, dragInfo, sourceEl, opts) => { setDrawerOpen(false); startTouchDrag(e, dragInfo, sourceEl, opts); };
   const poolProps = { products, filters, setFilters, startTouchDrag: poolStartTouchDrag, isMobile, selectedProductId, onSelectProduct: handleSelectProduct, productsInCase };
 
   return (
@@ -210,7 +230,7 @@ export default function App() {
           <button onClick={() => setPortraitDismissed(true)} style={{ background: "none", border: "none", color: T.textDim, cursor: "pointer", fontSize: 16, padding: "0 2px", lineHeight: 1 }}>×</button>
         </div>
       )}
-      <main style={{ padding: 14, overflowX: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? (drawerOpen ? "calc(58vh + 14px)" : 66) : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
+      <main style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? (drawerOpen ? "calc(58vh + 14px)" : 66) : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
             Case:<input
@@ -244,7 +264,7 @@ export default function App() {
 
         <CaseGrid
           pans={pans} products={products} caseWidth={caseWidth}
-          onDrop={handleDrop} onClearSlot={clearSlot} drag={drag}
+          onDrop={handleDrop} drag={drag}
           onRemovePan={handleRemovePanClick} onSetPanType={setPanType} onSetSlotType={setSlotType}
           onSetPanWidth={setPanWidth} onSetPanDepth={setPanDepth}
           isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
@@ -324,6 +344,7 @@ export default function App() {
             pan={pan} slotIdx={slotPicker.slotIdx}
             pans={pans} products={products}
             onAssign={handleSlotPickerAssign}
+            onRemove={() => { clearSlot(pan.id, slotPicker.slotIdx); setSlotPicker(null); }}
             onClose={() => setSlotPicker(null)}
           />
         ) : null;
@@ -333,8 +354,6 @@ export default function App() {
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
       {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentLayout={layout} onClose={() => setShowSaved(false)} />}
       {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { replaceLayout([], caseWidth); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
-      {confirmRemovePan && <ConfirmDialog message="Remove this pan? Any products in its slots will be unassigned." onConfirm={confirmRemovePanAction} onCancel={() => setConfirmRemovePan(null)} confirmLabel="Remove" />}
-      {clearSlotConfirm && <ConfirmDialog message="Remove product from this slot? Consider editing instead if this was a mistake." onConfirm={confirmClearSlotAction} onCancel={() => setClearSlotConfirm(null)} confirmLabel="Remove" />}
       {confirmExpand && <ConfirmDialog
         message={confirmExpand.edit.type === "resizePan"
           ? `Resizing this pan to ${confirmExpand.edit.width} won't fit — the case would need to expand to ${confirmExpand.requiredWidth} units. Expand the case?`
@@ -344,13 +363,22 @@ export default function App() {
         confirmLabel="Expand & Apply"
       />}
       {toast && (
-        <div style={{
+        <div role="status" style={{
           position: "fixed", bottom: isMobile ? 56 : 20, left: "50%", transform: "translateX(-50%)",
           background: T.surface, color: T.text, border: `1px solid ${T.borderLight}`,
-          padding: "8px 20px", borderRadius: 8, fontSize: 12, fontFamily: DFONT, fontWeight: 600,
+          padding: toast.undoable ? "0 0 0 16px" : "8px 20px", borderRadius: 8, fontSize: 13, fontFamily: DFONT, fontWeight: 600,
           boxShadow: "0 4px 16px rgba(0,0,0,0.4)", zIndex: 9999,
           animation: "fadeIn 0.15s ease",
-        }}>{toast}</div>
+          display: "flex", alignItems: "center", gap: 4, maxWidth: "calc(100vw - 32px)", whiteSpace: "nowrap",
+        }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{toast.msg}</span>
+          {toast.undoable && (
+            <button
+              onClick={undoFromToast}
+              style={{ minHeight: 44, minWidth: 64, padding: "0 16px", background: "none", border: "none", color: T.accent, fontSize: 13, fontWeight: 700, fontFamily: DFONT, cursor: "pointer" }}
+            >Undo</button>
+          )}
+        </div>
       )}
     </div>
   );

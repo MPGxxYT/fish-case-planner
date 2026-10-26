@@ -4,7 +4,7 @@ import { getSlotLabel } from "../utils/helpers.js";
 import { setDragSource, getDragSource, dragKind } from "../utils/dragData.js";
 import { canDrop } from "../case/drop.js";
 
-export default function PanSlot({ pan, slotIdx, products, onDrop, onClearSlot, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onPickProduct }) {
+export default function PanSlot({ pan, slotIdx, products, onDrop, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onPickProduct }) {
   const [dOver, setDOver] = useState(false);
   const slotRef = useRef();
   const product = pan.slots[slotIdx] ? products.find((p) => p.id === pan.slots[slotIdx]) : null;
@@ -22,11 +22,7 @@ export default function PanSlot({ pan, slotIdx, products, onDrop, onClearSlot, o
       onDrop({ kind: "pool", productId: selectedProductId }, target);
       return;
     }
-    if (product) {
-      onClearSlot(pan.id, slotIdx);
-    } else {
-      onPickProduct?.(pan.id, slotIdx);
-    }
+    onPickProduct?.(pan.id, slotIdx);
   };
 
   return (
