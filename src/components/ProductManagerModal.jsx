@@ -311,8 +311,9 @@ export default function ProductManagerModal({ products, onSave, onDelete, onClos
     setIsNew(true);
   }, []);
 
-  const handleSave = (prod) => {
-    onSave(prod);
+  // onSave and onDelete reject when the server refuses; the form stays as it was.
+  const handleSave = async (prod) => {
+    try { await onSave(prod); } catch { return; }
     if (isNew) {
       startNew();
     } else {
@@ -323,9 +324,10 @@ export default function ProductManagerModal({ products, onSave, onDelete, onClos
 
   const handleCancel = () => { if (original) setForm({ ...original }); };
   const handleDelete = () => { if (!selectedId || isNew) return; setConfirmDel(true); };
-  const confirmDeleteAction = () => {
-    onDelete(selectedId);
-    setSelectedId(null); setForm(null); setIsNew(false); setConfirmDel(false);
+  const confirmDeleteAction = async () => {
+    setConfirmDel(false);
+    try { await onDelete(selectedId); } catch { return; }
+    setSelectedId(null); setForm(null); setIsNew(false);
   };
 
   // ── Shared: search + filter/sort controls ──────────────────────────────────

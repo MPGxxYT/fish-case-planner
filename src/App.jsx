@@ -3,12 +3,12 @@ import { T, S, FONT, DFONT, PRODUCT_COLORS } from "./utils/constants.js";
 import { checkFit, clampCaseWidth, usedWidth as sumWidth } from "./case/layout.js";
 import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
 import { toSavedCase, readSavedCase } from "./case/savedCase.js";
-import { fetchPublicProducts, upsertPublicProduct, deletePublicProduct } from "./lib/api.js";
 import { autoGenerateCase } from "./utils/autoGenerate.js";
 import { dropToEdit } from "./case/drop.js";
 import { colorClashes, indexProducts, productsInCase as placedIds } from "./case/queries.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useLayout } from "./hooks/useLayout.js";
+import { useProductCatalog } from "./hooks/useProductCatalog.js";
 import { useCaseDrag } from "./hooks/useCaseDrag.js";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useTouchDrag } from "./hooks/useTouchDrag.js";
@@ -22,13 +22,9 @@ import CaseGrid from "./components/CaseGrid.jsx";
 import SlotPickerModal from "./components/SlotPickerModal.jsx";
 import ProductManagerModal from "./components/ProductManagerModal.jsx";
 
-const migrateColor = (c) => (c === "orange") ? "warm" : (c === "white" || c === "blue") ? "cool" : c;
-const migrateProducts = (ps) => ps.map((p) => ({ preferredZone: "", preferredSplit: "", ...p, color: migrateColor(p.color), preferredPosition: p.preferredPosition || "", labels: p.labels || [] }));
-
 export default function App() {
-  // localStorage acts as a stale-while-revalidate cache for the shared product catalog.
-  // On mount, cached products are shown immediately, then the fresh fetch overwrites them.
-  const [products, setProducts] = useLocalStorage("fcp3_products", [], migrateProducts);
+  const catalog = useProductCatalog();
+  const { products } = catalog;
   const { layout, dispatch, undo, redo, canUndo, canRedo } = useLayout();
   const { pans, caseWidth } = layout;
   const [caseWidthDraft, setCaseWidthDraft] = useState(String(caseWidth));
@@ -48,24 +44,14 @@ export default function App() {
   const [confirmExpand, setConfirmExpand] = useState(null); // { edit, requiredWidth, product? }
   const [confirmRemovePan, setConfirmRemovePan] = useState(null);
   const [slotPicker, setSlotPicker] = useState(null); // { panId, slotIdx }
-  const [productsRefreshing, setProductsRefreshing] = useState(false);
   const [toast, setToast] = useState(null);
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast((t) => t === msg ? null : t), 2000); };
 
-  // On mount, load products from the shared catalog (overrides local cache)
-  useEffect(() => {
-    fetchPublicProducts()
-      .then((ps) => { if (ps.length > 0) setProducts(ps); })
-      .catch(() => {}); // Silently fall back to localStorage on error
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   const refreshProducts = () => {
-    if (productsRefreshing) return;
-    setProductsRefreshing(true);
-    fetchPublicProducts()
-      .then((ps) => { setProducts(ps); showToast(`Products updated (${ps.length})`); })
-      .catch(() => showToast("Failed to refresh products"))
-      .finally(() => setProductsRefreshing(false));
+    if (catalog.refreshing) return;
+    catalog.refresh()
+      .then((ps) => showToast(`Products updated (${ps.length})`))
+      .catch((err) => showToast(`Couldn't refresh products: ${err.message}`));
   };
 
   const [selectedProductId, setSelectedProductId] = useState(null);
@@ -138,18 +124,19 @@ export default function App() {
     onDrop: handleDrop,
   });
 
-  const handleProductSave = (prod) => {
-    setProducts((ps) => {
-      const idx = ps.findIndex((p) => p.id === prod.id);
-      if (idx >= 0) { const c = [...ps]; c[idx] = prod; return c; }
-      return [...ps, prod];
-    });
-    upsertPublicProduct(prod).catch(() => {});
-  };
+  // Both reject when the server refuses, so the Product Manager keeps the form open.
+  const handleProductSave = (prod) => catalog.save(prod).catch((err) => {
+    showToast(`Couldn't save ${prod.name}: ${err.message}`);
+    throw err;
+  });
   const deleteProduct = (id) => {
-    setProducts((ps) => ps.filter((p) => p.id !== id));
-    dispatch({ type: "removeProductEverywhere", productId: id });
-    deletePublicProduct(id).catch(() => {});
+    const name = products.find((p) => p.id === id)?.name || "product";
+    return catalog.remove(id)
+      .then(() => dispatch({ type: "removeProductEverywhere", productId: id }))
+      .catch((err) => {
+        showToast(`Couldn't delete ${name}: ${err.message}`);
+        throw err;
+      });
   };
   const handleGenerate = (items, w) => { replaceLayout(autoGenerateCase(items, w), w); setShowAutoGen(false); };
   const saveCase = () => {
@@ -316,11 +303,11 @@ export default function App() {
           </span>
           <div style={{ position: "absolute", right: 16, display: "flex", gap: 6, alignItems: "center" }}>
             <button
-              style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 8px" : "5px 10px", opacity: productsRefreshing ? 0.5 : 1 }}
+              style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 8px" : "5px 10px", opacity: catalog.refreshing ? 0.5 : 1 }}
               onClick={(e) => { e.stopPropagation(); refreshProducts(); }}
               title="Refresh product list from database"
-              disabled={productsRefreshing}
-            >{productsRefreshing ? "⟳" : "⟳"} {!isMobile && "Refresh"}</button>
+              disabled={catalog.refreshing}
+            >⟳ {!isMobile && "Refresh"}</button>
             <button style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 10px" : "5px 14px" }} onClick={(e) => { e.stopPropagation(); setShowProductManager(true); }}>Manage</button>
           </div>
         </div>
