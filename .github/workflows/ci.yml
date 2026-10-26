@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:api
+      - run: npm run build
+      - name: Check the server config
+        run: npm run check:server
+      # The deploy job ships this exact build, so what was tested is what goes out.
+      - if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # One deploy at a time; a newer push waits for the one in progress.
+    concurrency: deploy
+    env:
+      SERVER: ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Set up SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf 'Host *\n  IdentityFile ~/.ssh/id_deploy\n  StrictHostKeyChecking accept-new\n' > ~/.ssh/config
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Copies compose.yaml, conf/, dist/ and api/ into ~/fish-case-planner.
+      # Old files go once the new ones are in place. data/ holds the
+      # database, so it's excluded: --delete-delay would otherwise remove it.
+      - name: Copy the build to the server
+        run: rsync --recursive --compress --delete-delay --exclude /data --exclude '*.test.js' deploy/ dist api "$SERVER:fish-case-planner/"
+
+      # The API reads its code once at startup, so it restarts; nginx only reloads.
+      - name: Start or restart the containers
+        run: ssh "$SERVER" "cd fish-case-planner && mkdir -p data && docker compose up --detach && docker compose restart api && docker compose exec -T web nginx -s reload"

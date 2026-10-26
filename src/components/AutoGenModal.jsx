@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { T, S, DFONT, FONT, DEFAULT_CASE_WIDTH, PRODUCT_COLORS, FISH_TYPES } from "../utils/constants.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
-import { isSupabaseConfigured, fetchCaseByCode } from "../lib/supabase.js";
+import { fetchCaseByCode } from "../lib/api.js";
 import { estimateTotalWidth } from "../utils/autoGenerate.js";
 
 // ── Available product row ─────────────────────────────────────────────────────
@@ -269,21 +269,19 @@ export default function AutoGenModal({ products, savedCases = [], onGenerate, on
           >Import</button>
         </div>
       )}
-      {isSupabaseConfigured && (
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <input
-            style={{ ...S.inp, flex: 1, fontSize: 12, letterSpacing: 1, textTransform: "uppercase" }}
-            value={codeInput}
-            onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 6))}
-            placeholder="Share code…"
-            onKeyDown={(e) => e.key === "Enter" && handleCodeImport()}
-          />
-          <button onClick={handleCodeImport} disabled={!codeInput.trim() || codeLoading} style={{ ...S.bp, fontSize: 11, padding: "4px 12px", opacity: !codeInput.trim() ? 0.4 : 1 }}>
-            {codeLoading ? "…" : "Load"}
-          </button>
-          {codeError && <span style={{ fontSize: 10, color: T.danger }}>{codeError}</span>}
-        </div>
-      )}
+      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <input
+          style={{ ...S.inp, flex: 1, fontSize: 12, letterSpacing: 1, textTransform: "uppercase" }}
+          value={codeInput}
+          onChange={(e) => setCodeInput(e.target.value.toUpperCase().slice(0, 6))}
+          placeholder="Share code…"
+          onKeyDown={(e) => e.key === "Enter" && handleCodeImport()}
+        />
+        <button onClick={handleCodeImport} disabled={!codeInput.trim() || codeLoading} style={{ ...S.bp, fontSize: 11, padding: "4px 12px", opacity: !codeInput.trim() ? 0.4 : 1 }}>
+          {codeLoading ? "…" : "Load"}
+        </button>
+        {codeError && <span style={{ fontSize: 10, color: T.danger }}>{codeError}</span>}
+      </div>
     </div>
   );
 

@@ -1,7 +1,7 @@
 # Fish Case Planner
 
 ## Overview
-A web app for Whole Foods fishmongers to plan and build fish display case layouts. Used on both phone and desktop. Hosted on Vercel.
+A web app for Whole Foods fishmongers to plan and build fish display case layouts. Used on both phone and desktop. Hosted on the home server (see docs/deploy.md).
 
 **Current state:** Working React prototype (single-file JSX) with localStorage. Needs to be refactored into a proper multi-file React project and eventually connected to a Spring Boot + PostgreSQL backend.
 
@@ -166,7 +166,7 @@ interface SavedCase {
 - Single React JSX component
 - localStorage for persistence
 - Inline styles with dark theme
-- Hosted on Vercel
+- Published cases and the shared product catalog in SQLite behind a small Node API (`api/`), on the home server
 
 ### Target Architecture
 - **Frontend:** React (Vite) on Vercel

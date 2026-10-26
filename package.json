@@ -5,16 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "node --watch api/index.js",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:api": "node --test \"api/*.test.js\"",
+    "check:server": "node scripts/check-server.mjs",
+    "export:supabase": "node --env-file=.env scripts/export-supabase.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.97.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.7.0",
     "vite": "^6.4.1"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
