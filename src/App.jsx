@@ -36,7 +36,8 @@ export default function App() {
   const [showProductManager, setShowProductManager] = useState(false);
   const [showAutoGen, setShowAutoGen] = useState(false);
   const [showPrint, setShowPrint] = useState(false);
-  const [showSaved, setShowSaved] = useState(false);
+  const [showSaved, setShowSaved] = useState(false); // false, or the tab to open: "local" | "public"
+  const [addPanOpen, setAddPanOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
@@ -220,14 +221,14 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: T.bg, color: T.text, fontFamily: DFONT }}>
-      <header style={{ padding: "10px 16px", background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 20 }}>🐟</span>
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 800, fontFamily: DFONT, background: `linear-gradient(135deg,${T.accent},#818cf8)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Case Planner</h1>
+      <header style={{ padding: isMobile ? "6px 12px" : "10px 16px", background: T.surface, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: isMobile ? 6 : 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          {!isMobile && <span style={{ fontSize: 20 }}>🐟</span>}
+          <h1 style={{ margin: 0, fontSize: isMobile ? 15 : 16, whiteSpace: "nowrap", fontWeight: 800, fontFamily: DFONT, background: `linear-gradient(135deg,${T.accent},#818cf8)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Case Planner</h1>
         </div>
         <div style={{ flex: 1 }} />
         <button style={{ ...S.hb, ...tap }} onClick={() => setShowAutoGen(true)}>⚡ Auto</button>
-        <button style={{ ...S.hb, ...tap }} onClick={() => setShowSaved(true)}>📁 Saved</button>
+        <button style={{ ...S.hb, ...tap }} onClick={() => setShowSaved("local")}>📁 Saved</button>
         <button style={{ ...S.hb, ...tap }} onClick={() => setShowPrint(true)}>🖨 Print</button>
       </header>
 
@@ -257,17 +258,24 @@ export default function App() {
             <button style={{ ...S.ch, ...tap }} onClick={() => setShowSaveInput(true)}>💾 Save</button>
           )}
           <button style={{ ...S.ch, ...tap, color: T.danger }} onClick={() => setConfirmClear(true)}>🗑 Clear</button>
+          {/* Phones keep the add-pan controls folded away until needed, so the case sits higher */}
+          {isMobile && (
+            <button style={{ ...S.ch, ...tap, ...(addPanOpen && { background: T.accent, color: T.bg }) }} aria-expanded={addPanOpen} onClick={() => setAddPanOpen((o) => !o)}>
+              + Add pan {addPanOpen ? "▲" : "▼"}
+            </button>
+          )}
           {/* On phones Undo/Redo live in the bottom bar, within thumb reach */}
           {!isMobile && <button style={{ ...S.ch, opacity: canUndo ? 1 : 0.35 }} disabled={!canUndo} onClick={undo}>↩ Undo</button>}
           {!isMobile && <button style={{ ...S.ch, opacity: canRedo ? 1 : 0.35 }} disabled={!canRedo} onClick={redo}>↪ Redo</button>}
         </div>
 
-        <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} dividerEditMode={dividerEditMode} />
+        {(!isMobile || addPanOpen) && <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} dividerEditMode={dividerEditMode} />}
 
         <CaseGrid
           pans={pans} products={products} caseWidth={caseWidth}
           onDrop={handleDrop} drag={drag}
           onOpenPanSheet={setPanSheetId}
+          onLoadPublished={() => setShowSaved("public")}
           isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
           selectedProductId={selectedProductId} onPickProduct={handlePickProduct}
           dividers={dividers}
@@ -380,7 +388,7 @@ export default function App() {
       {showProductManager && <ProductManagerModal products={products} onSave={handleProductSave} onDelete={deleteProduct} onClose={() => setShowProductManager(false)} />}
       {showAutoGen && <AutoGenModal products={products} savedCases={savedCases} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
-      {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentLayout={layout} onClose={() => setShowSaved(false)} />}
+      {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentLayout={layout} initialTab={showSaved} onClose={() => setShowSaved(false)} />}
       {confirmClear && <ConfirmDialog message={pans.length === 1 ? "Clear the only pan from the case? Undo brings it back." : `Clear all ${pans.length} pans from the case? Undo brings them back.`} onConfirm={() => { replaceLayout([], caseWidth); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear case" />}
       {confirmExpand && <ConfirmDialog
         message={confirmExpand.edit.type === "resizePan"

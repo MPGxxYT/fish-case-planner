@@ -487,8 +487,8 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentLayo
 
 /* ── Main modal ── */
 
-export default function SavedCasesModal({ savedCases, products, onLoad, onDelete, onExport, onImport, onLoadPublic, onUpdateLocal, onSavePublicToLocal, currentLayout, onClose }) {
-  const [tab, setTab] = useState("local");
+export default function SavedCasesModal({ savedCases, products, onLoad, onDelete, onExport, onImport, onLoadPublic, onUpdateLocal, onSavePublicToLocal, currentLayout, onClose, initialTab = "local" }) {
+  const [tab, setTab] = useState(initialTab);
 
   return (
     <div style={S.ov} onClick={onClose}>
