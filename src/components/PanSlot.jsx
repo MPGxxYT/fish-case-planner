@@ -57,7 +57,7 @@ export default function PanSlot({ pan, slotIdx, products, onDrop, onSetSlotType,
         position: "relative", overflow: "hidden", transition: "background 0.12s",
         cursor: isPlaceMode ? "copy" : product ? "grab" : "pointer", userSelect: "none",
       }}
-      title={isPlaceMode ? "Tap to place here" : product ? `${product.name}${product.plu ? ` (${product.plu})` : ""}\nDrag to swap · Tap to remove` : undefined}
+      title={isPlaceMode ? "Tap to place here" : product ? `${product.name}${product.plu ? ` (${product.plu})` : ""}\nTap to replace · Hold and drag to swap` : undefined}
     >
       {color && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: color.bg, opacity: 0.8 }} />}
       {depthLabel && (

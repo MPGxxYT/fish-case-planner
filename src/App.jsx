@@ -77,14 +77,18 @@ export default function App() {
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) : null;
 
   const { isMobile, isPortrait } = useIsMobile();
-  const [portraitDismissed, setPortraitDismissed] = useState(false);
   const drag = useCaseDrag(handleDrop);
 
   const usedWidth = sumWidth(pans);
   const remainingWidth = caseWidth - usedWidth;
-  const colorWarnings = useMemo(() => colorClashes(pans, indexProducts(products)).map(({ a, b }) =>
-    `"${a.product.name}" and "${b.product.name}" are side by side, both ${PRODUCT_COLORS[a.product.color]?.label || a.product.color}`
-  ), [pans, products]);
+  // Pans are numbered from the left, as they stand in the case.
+  const colorWarnings = useMemo(() => {
+    const position = new Map(pans.map((p, i) => [p.id, i + 1]));
+    return colorClashes(pans, indexProducts(products)).map(({ a, b }) => {
+      const color = PRODUCT_COLORS[a.product.color]?.label || a.product.color;
+      return `Pans ${position.get(a.panId)} and ${position.get(b.panId)}: ${a.product.name} and ${b.product.name} are both ${color} and blend together.`;
+    });
+  }, [pans, products]);
 
   const productsInCase = useMemo(() => placedIds(pans), [pans]);
 
@@ -223,13 +227,6 @@ export default function App() {
         <button style={S.hb} onClick={() => setShowPrint(true)}>🖨 Print</button>
       </header>
 
-      {isMobile && isPortrait && !portraitDismissed && (
-        <div style={{ padding: "7px 14px", background: T.warning + "18", borderBottom: `1px solid ${T.warning}28`, display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ fontSize: 15 }}>⟳</span>
-          <span style={{ flex: 1, fontSize: 11, color: T.warning, fontFamily: FONT }}>Rotate to landscape for the best experience</span>
-          <button onClick={() => setPortraitDismissed(true)} style={{ background: "none", border: "none", color: T.textDim, cursor: "pointer", fontSize: 16, padding: "0 2px", lineHeight: 1 }}>×</button>
-        </div>
-      )}
       <main style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? (drawerOpen ? "calc(58vh + 14px)" : 66) : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
@@ -353,14 +350,14 @@ export default function App() {
       {showAutoGen && <AutoGenModal products={products} savedCases={savedCases} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
       {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentLayout={layout} onClose={() => setShowSaved(false)} />}
-      {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { replaceLayout([], caseWidth); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
+      {confirmClear && <ConfirmDialog message={pans.length === 1 ? "Clear the only pan from the case? Undo brings it back." : `Clear all ${pans.length} pans from the case? Undo brings them back.`} onConfirm={() => { replaceLayout([], caseWidth); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear case" />}
       {confirmExpand && <ConfirmDialog
         message={confirmExpand.edit.type === "resizePan"
-          ? `Resizing this pan to ${confirmExpand.edit.width} won't fit — the case would need to expand to ${confirmExpand.requiredWidth} units. Expand the case?`
-          : `No room for ${confirmExpand.product.name} — needs ${confirmExpand.product.minPan} units but only ${remainingWidth} left. Add anyway and expand the case to ${confirmExpand.requiredWidth}?`}
+          ? `A ${confirmExpand.edit.width}-wide pan won't fit. Grow the case from ${caseWidth} to ${confirmExpand.requiredWidth} units?`
+          : `${confirmExpand.product.name} needs ${confirmExpand.product.minPan} units and only ${remainingWidth} are left. Add it and grow the case from ${caseWidth} to ${confirmExpand.requiredWidth} units?`}
         onConfirm={confirmExpandAction}
         onCancel={() => setConfirmExpand(null)}
-        confirmLabel="Expand & Apply"
+        confirmLabel="Grow case"
       />}
       {toast && (
         <div role="status" style={{
