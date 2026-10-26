@@ -4,6 +4,7 @@ import { usedWidth as sumWidth } from "../case/layout.js";
 import { dragKind, getDragSource } from "../utils/dragData.js";
 import { canDrop } from "../case/drop.js";
 import PanColumn from "./PanColumn.jsx";
+import CaseOverview from "./CaseOverview.jsx";
 
 export const DIVIDER_COLOR = "#94a3b8";
 
@@ -98,23 +99,36 @@ function getPanSummary(pans) {
     const key = `${p.width}${p.panType === "deep" ? "D" : "S"}`;
     counts[key] = (counts[key] || 0) + 1;
   });
-  return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
+  return Object.entries(counts).map(([k, v]) => `${k} ×${v}`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onDrop, onOpenPanSheet, drag, isMobile, isPortrait, startTouchDrag, selectedProductId, onPickProduct, dividers = new Set(), dividerEditMode = false, onToggleDividerEditMode }) {
+export default function CaseGrid({ pans, products, caseWidth, onDrop, onOpenPanSheet, onLoadPublished, drag, isMobile, isPortrait, startTouchDrag, selectedProductId, onPickProduct, dividers = new Set(), dividerEditMode = false, onToggleDividerEditMode }) {
   const { insertTarget, panDragId } = drag;
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
   const [hoverInsertIdx, setHoverInsertIdx] = useState(null);
   const [hoverDividerIdx, setHoverDividerIdx] = useState(null);
+  // Where the case view is scrolled, for the overview's frame.
+  const [view, setView] = useState({ scrollLeft: 0, clientWidth: 0, scrollWidth: 0 });
+  const readView = () => {
+    const el = caseRef.current;
+    if (el) setView({ scrollLeft: el.scrollLeft, clientWidth: el.clientWidth, scrollWidth: el.scrollWidth });
+  };
 
   useEffect(() => {
     const obs = new ResizeObserver((entries) => {
       if (entries[0]) setContainerWidth(entries[0].contentRect.width);
+      readView();
     });
     if (caseRef.current) obs.observe(caseRef.current);
     return () => obs.disconnect();
   }, []);
+  useEffect(readView, [pans, caseWidth]);
+
+  const jumpTo = (fraction) => {
+    const el = caseRef.current;
+    if (el) el.scrollTo({ left: fraction * el.scrollWidth - el.clientWidth / 2, behavior: "smooth" });
+  };
 
   // On mobile: instantly reset horizontal scroll when case shrinks so iOS doesn't animate it
   const prevCaseWidthRef = useRef(caseWidth);
@@ -131,19 +145,29 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onOpenPanS
   const minUnit = isMobile ? 8 : 3;
   const unitSize = Math.max(minUnit, (containerWidth - 2) / Math.max(caseWidth, usedWidth));
   const summary = useMemo(() => getPanSummary(pans), [pans]);
+  const overflows = view.scrollWidth > view.clientWidth + 1;
+  const sideLabel = { fontSize: 11, color: T.textMuted, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 1 };
+  const edgeLabel = { display: "flex", alignItems: "center", padding: isMobile ? "0 4px" : "0 8px" };
 
   return (
     <>
+      {/* Sticky on phones so the overview stays in view while the page scrolls */}
+      {pans.length > 0 && overflows && (
+        <div style={{ position: isMobile ? "sticky" : "static", top: 0, zIndex: 20, background: T.bg, padding: isMobile ? "0 22px" : "0 30px" }}>
+          <CaseOverview pans={pans} products={products} caseWidth={caseWidth} view={view} onJump={jumpTo} />
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "stretch", gap: 0 }}>
-        {/* Left label */}
-        <div style={{ display: "flex", alignItems: "center", padding: "0 8px" }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: T.textDim, fontFamily: FONT }}>L</span>
+        <div style={edgeLabel}>
+          <span style={{ fontSize: isMobile ? 12 : 14, fontWeight: 700, color: T.textDim, fontFamily: FONT }}>L</span>
         </div>
 
         {/* Case container */}
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+          <div style={{ ...sideLabel, textAlign: "center", marginBottom: 4 }}>Customer side</div>
           <div
             ref={caseRef}
+            onScroll={readView}
             className="case-container"
             style={{
               display: "flex", border: `2px solid ${T.borderLight}`, borderRadius: 6,
@@ -172,9 +196,13 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onOpenPanS
                   setHoverInsertIdx(null);
                 }}
               >
-                <span style={{ fontSize: 28, opacity: 0.25 }}>🐟</span>
-                <span style={{ fontSize: 12, color: T.textDim }}>Add a pan above, or tap Auto to build a case from your products</span>
-                <span style={{ fontSize: 10, color: T.textDim }}>Or drag a product here from Products</span>
+                <span style={{ fontSize: 14, color: T.textMuted, textAlign: "center", padding: "0 16px" }}>The case is empty</span>
+                {onLoadPublished && (
+                  <button type="button" onClick={onLoadPublished} style={{ minHeight: 44, padding: "0 16px", borderRadius: 8, background: T.accent, color: T.bg, border: "none", fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+                    Load a published case
+                  </button>
+                )}
+                <span style={{ fontSize: 12, color: T.textMuted, textAlign: "center", padding: "0 16px" }}>Or add a pan, tap Auto, or drag a product here from Products</span>
               </div>
             ) : (
               <>
@@ -226,9 +254,9 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onOpenPanS
             )}
           </div>
 
-          {/* "Top Of Case" label below, with a small tab to toggle divider editing */}
+          {/* The employee side is the bottom edge; the Dividers toggle sits beside it */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginTop: 4, minHeight: isMobile ? 44 : undefined }}>
-            <span style={{ fontSize: 10, color: T.textDim, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 1 }}>Top Of Case</span>
+            <span style={sideLabel}>Your side</span>
             {onToggleDividerEditMode && (
               <button
                 type="button"
@@ -253,32 +281,14 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onOpenPanS
           )}
         </div>
 
-        {/* Right label */}
-        <div style={{ display: "flex", alignItems: "center", padding: "0 8px" }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: T.textDim, fontFamily: FONT }}>R</span>
+        <div style={edgeLabel}>
+          <span style={{ fontSize: isMobile ? 12 : 14, fontWeight: 700, color: T.textDim, fontFamily: FONT }}>R</span>
         </div>
       </div>
 
-      {/* Pan summary */}
       {pans.length > 0 && (
-        <div style={{ fontSize: 10, color: T.textMuted, fontFamily: FONT, padding: "2px 0" }}>
-          Pans: {summary} — {usedWidth}/{caseWidth} units
-        </div>
-      )}
-
-      {pans.length > 0 && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-          {pans.map((pan) => {
-            const prods = Object.values(pan.slots).filter(Boolean).map((id) => products.find((p) => p.id === id)).filter(Boolean);
-            return (
-              <div key={pan.id} style={{ fontSize: 9, padding: "2px 6px", borderRadius: 3, background: T.surfaceAlt, border: `1px solid ${T.border}`, color: T.textMuted, fontFamily: FONT }}>
-                <span style={{ color: T.accent, fontWeight: 700 }}>{pan.width}</span>
-                <span style={{ color: pan.panType === "deep" ? "#60a5fa" : "#fbbf24", marginLeft: 2 }}>{pan.panType === "deep" ? "D" : "S"}</span>
-                {pan.depth !== "full" && <span> {pan.depth === "half" ? "½" : "⅓"}</span>}
-                {prods.length > 0 && <span> — {prods.map((p) => p.name).join(", ")}</span>}
-              </div>
-            );
-          })}
+        <div style={{ fontSize: 12, color: T.textMuted, fontFamily: FONT, padding: "2px 0" }}>
+          {pans.length} {pans.length === 1 ? "pan" : "pans"} to grab: {summary}
         </div>
       )}
     </>
