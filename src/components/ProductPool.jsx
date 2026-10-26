@@ -173,7 +173,7 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
                   }}>{p.deepShallow === "deep" ? "D" : "S"}</span>
                   <div style={{ flex: 1 }} />
                   <span
-                    onTouchStart={(e) => { e.stopPropagation(); startTouchDrag(e, { kind: "pool", productId: p.id }, e.currentTarget.closest("[data-pool-item]")); }}
+                    onTouchStart={(e) => { e.stopPropagation(); startTouchDrag(e, { kind: "pool", productId: p.id }, e.currentTarget.closest("[data-pool-item]"), { delay: 0 }); }}
                     style={{ fontSize: 13, color: T.textDim, cursor: "grab", padding: "2px 3px", touchAction: "none", lineHeight: 1 }}
                     title="Drag to insert new pan"
                   >⠿</span>

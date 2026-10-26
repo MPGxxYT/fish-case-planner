@@ -99,7 +99,7 @@ function getPanSummary(pans) {
   return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onDrop, onClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, drag, isMobile, isPortrait, startTouchDrag, selectedProductId, onPickProduct, dividers = new Set(), dividerEditMode = false, onToggleDividerEditMode }) {
+export default function CaseGrid({ pans, products, caseWidth, onDrop, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, drag, isMobile, isPortrait, startTouchDrag, selectedProductId, onPickProduct, dividers = new Set(), dividerEditMode = false, onToggleDividerEditMode }) {
   const { insertTarget, panDragId } = drag;
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
@@ -139,7 +139,7 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onClearSlo
         </div>
 
         {/* Case container */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
           <div
             ref={caseRef}
             className="case-container"
@@ -182,7 +182,7 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onClearSlo
                   <span key={pan.id} style={{ display: "contents" }}>
                     <PanColumn
                       pan={pan} products={products}
-                      onDrop={onDrop} onClearSlot={onClearSlot}
+                      onDrop={onDrop}
                       unitSize={unitSize} onRemovePan={onRemovePan} onSetPanType={onSetPanType}
                       onSetSlotType={onSetSlotType} onSetPanWidth={onSetPanWidth} onSetPanDepth={onSetPanDepth}
                       remainingWidth={remainingWidth}

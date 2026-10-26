@@ -10,7 +10,7 @@ function relevanceScore(name, sq) {
   return 2;
 }
 
-export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign, onClose }) {
+export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign, onRemove, onClose }) {
   const { isMobile, isPortrait } = useIsMobile();
   const landscape = isMobile && !isPortrait;
 
@@ -21,7 +21,10 @@ export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign
   const [filterFishType, setFilterFishType] = useState("");
   const searchRef = useRef();
 
-  useEffect(() => { searchRef.current?.focus(); }, []);
+  // On a phone the keyboard would cover the list, so only focus search on desktop.
+  useEffect(() => { if (!isMobile) searchRef.current?.focus(); }, [isMobile]);
+
+  const current = products.find((p) => p.id === pan.slots[slotIdx]) ?? null;
 
   // Products already placed anywhere in the case (excluding the current slot)
   const inTheCase = useMemo(() => productsInCase(pans, { except: { panId: pan.id, slot: slotIdx } }), [pans, pan, slotIdx]);
@@ -190,12 +193,18 @@ export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign
         {/* Header */}
         <div style={{ padding: landscape ? "7px 12px" : "11px 14px 9px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: landscape ? 12 : 13, fontWeight: 700, color: T.text, fontFamily: DFONT }}>Pick a Product</div>
+            <div style={{ fontSize: landscape ? 12 : 13, fontWeight: 700, color: T.text, fontFamily: DFONT }}>{current ? `Replace ${current.name}` : "Pick a Product"}</div>
             <div style={{ fontSize: 10, color: T.textDim, fontFamily: FONT }}>
               {pan.width}u · {pan.depth}{pan.depth !== "full" ? ` · slot ${slotIdx + 1}` : ""}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: T.textDim, fontSize: 20, cursor: "pointer", lineHeight: 1, padding: "0 2px" }}>×</button>
+          {current && onRemove && (
+            <button
+              onClick={onRemove}
+              style={{ minHeight: 44, padding: "0 12px", borderRadius: 6, background: "none", border: `1px solid ${T.danger}66`, color: T.danger, fontSize: 13, fontWeight: 600, fontFamily: DFONT, cursor: "pointer" }}
+            >Remove</button>
+          )}
+          <button onClick={onClose} aria-label="Close" style={{ minWidth: 44, minHeight: 44, background: "none", border: "none", color: T.textMuted, fontSize: 22, cursor: "pointer", lineHeight: 1 }}>×</button>
         </div>
 
         {landscape ? (

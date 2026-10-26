@@ -2,19 +2,28 @@ import { useRef, useState } from "react";
 import { readTarget } from "../utils/dragData.js";
 import { canDrop } from "../case/drop.js";
 
-const DRAG_THRESHOLD = 8; // px before drag starts
+const DRAG_THRESHOLD = 8; // px before an immediate drag starts
+const LONG_PRESS_MS = 300; // hold this long before a press-to-drag starts
+const PRESS_TOLERANCE = 10; // px a finger may wander while holding; more is a scroll
 
-const idleState = () => ({ source: null, startX: 0, startY: 0, moved: false, ghostEl: null, lastTarget: null, sourceEl: null });
+const idleState = () => ({
+  source: null, startX: 0, startY: 0, lastX: 0, lastY: 0,
+  started: false, pressTimer: null, ghostEl: null, lastTarget: null, sourceEl: null,
+});
 
 // Touch drag: follows the finger with a ghost of the source element, then
 // reports the drop as (source, target) to onDrop, like mouse drag does.
+//
+// Sources inside the scrolling case (Slots, Pan headers) start on a long press,
+// so a swipe across the case scrolls it instead of moving a Product or Pan.
+// Explicit grips pass { delay: 0 } and start as soon as the finger moves.
 export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, onDrop }) {
   const dragStateRef = useRef(idleState());
 
   // Tiny React state just to expose whether a drag is active (for cursors etc.)
   const [isDragging, setIsDragging] = useState(false);
 
-  function createGhost(touch) {
+  function createGhost(x, y) {
     const sourceEl = dragStateRef.current.sourceEl;
     if (!sourceEl) return;
     const ghost = sourceEl.cloneNode(true);
@@ -28,8 +37,8 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
       "transform:scale(1.05)",
       `width:${w}px`,
       `height:${h}px`,
-      `left:${touch.clientX - w / 2}px`,
-      `top:${touch.clientY - h / 2}px`,
+      `left:${x - w / 2}px`,
+      `top:${y - h / 2}px`,
       "transition:none",
       "border-radius:6px",
       "box-shadow:0 8px 24px rgba(0,0,0,0.5)",
@@ -85,18 +94,37 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
     setInsertTarget({ panId: targetPanId, side });
   }
 
-  function handleTouchMove(e) {
-    const touch = e.touches[0];
+  function beginDrag() {
     const ds = dragStateRef.current;
-    const dx = touch.clientX - ds.startX;
-    const dy = touch.clientY - ds.startY;
+    ds.started = true;
+    createGhost(ds.lastX, ds.lastY);
+    setIsDragging(true);
+    if (ds.source.kind === "pan") setPanDragId(ds.source.panId);
+  }
 
-    if (!ds.moved) {
-      if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
-      ds.moved = true;
-      createGhost(touch);
-      setIsDragging(true);
-      if (ds.source.kind === "pan") setPanDragId(ds.source.panId);
+  // The click that follows a long press would open the Slot picker or a menu.
+  function swallowNextClick() {
+    const swallow = (e) => { e.stopPropagation(); e.preventDefault(); };
+    document.addEventListener("click", swallow, { capture: true, once: true });
+    setTimeout(() => document.removeEventListener("click", swallow, { capture: true }), 400);
+  }
+
+  function handleTouchMove(e) {
+    const ds = dragStateRef.current;
+    if (e.touches.length > 1) { finish(null); return; }
+    const touch = e.touches[0];
+    const dist = Math.hypot(touch.clientX - ds.startX, touch.clientY - ds.startY);
+    ds.lastX = touch.clientX;
+    ds.lastY = touch.clientY;
+
+    if (!ds.started) {
+      if (ds.pressTimer) {
+        // Still waiting for the long press: moving means the finger is scrolling.
+        if (dist > PRESS_TOLERANCE) finish(null);
+        return;
+      }
+      if (dist < DRAG_THRESHOLD) return;
+      beginDrag();
     }
 
     e.preventDefault();
@@ -107,45 +135,72 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
   }
 
   function handleTouchEnd(e) {
+    finish(e.changedTouches?.[0] ?? null);
+  }
+
+  function handleCancel() {
+    finish(null);
+  }
+
+  // Ends the gesture. With a touch point a started drag drops there; without
+  // one (scroll, second finger, cancel, window blur) it is abandoned.
+  function finish(touch) {
     document.removeEventListener("touchmove", handleTouchMove);
     document.removeEventListener("touchend", handleTouchEnd);
-    document.removeEventListener("touchcancel", handleTouchEnd);
+    document.removeEventListener("touchcancel", handleCancel);
+    window.removeEventListener("blur", handleCancel);
 
-    const { ghostEl, moved, source } = dragStateRef.current;
-    if (ghostEl) document.body.removeChild(ghostEl);
+    const { ghostEl, started, source, pressTimer } = dragStateRef.current;
+    clearTimeout(pressTimer);
+    if (ghostEl) ghostEl.remove();
     document.body.classList.remove("touch-dragging");
     clearHighlight();
 
-    if (moved) {
-      if (source.kind === "pan") {
-        const it = insertTargetRef.current;
-        if (it) onDrop(source, { kind: "pan", panId: it.panId, side: it.side });
-      } else {
-        const touch = e.changedTouches[0];
-        const hit = dropTargetAt(touch.clientX, touch.clientY);
-        if (hit) onDrop(source, hit.target);
+    if (started) {
+      swallowNextClick();
+      if (touch) {
+        if (source.kind === "pan") {
+          const it = insertTargetRef.current;
+          if (it) onDrop(source, { kind: "pan", panId: it.panId, side: it.side });
+        } else {
+          const hit = dropTargetAt(touch.clientX, touch.clientY);
+          if (hit) onDrop(source, hit.target);
+        }
       }
+      setInsertTarget(null);
+      setPanDragId(null);
+      setIsDragging(false);
     }
 
-    setInsertTarget(null);
-    setPanDragId(null);
-    setIsDragging(false);
     dragStateRef.current = idleState();
   }
 
-  // source is a drop source (see case/drop.js); sourceEl a React ref or DOM node to ghost
-  function startTouchDrag(e, source, sourceEl) {
+  // source is a drop source (see case/drop.js); sourceEl a React ref or DOM node to ghost.
+  // delay: ms to hold before the drag starts; 0 starts on movement instead.
+  function startTouchDrag(e, source, sourceEl, { delay = LONG_PRESS_MS } = {}) {
+    if (e.touches.length > 1) return;
+    if (dragStateRef.current.source) finish(null);
     const touch = e.touches[0];
     dragStateRef.current = {
       ...idleState(),
       source,
       startX: touch.clientX,
       startY: touch.clientY,
+      lastX: touch.clientX,
+      lastY: touch.clientY,
       sourceEl: sourceEl?.current ?? sourceEl,
     };
+    if (delay > 0) {
+      dragStateRef.current.pressTimer = setTimeout(() => {
+        dragStateRef.current.pressTimer = null;
+        navigator.vibrate?.(15);
+        beginDrag();
+      }, delay);
+    }
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("touchend", handleTouchEnd);
-    document.addEventListener("touchcancel", handleTouchEnd);
+    document.addEventListener("touchcancel", handleCancel);
+    window.addEventListener("blur", handleCancel);
   }
 
   return { startTouchDrag, isDragging };
