@@ -20,8 +20,9 @@ async function request(method, path, body) {
 }
 
 
-export function publishCase(name, author, pans, products, caseWidth) {
-  return request("POST", "/cases", { name, author: author || "", caseWidth, pans, products: placedProducts(pans, products) });
+export function publishCase(savedCase, author, products) {
+  const { name, caseWidth, pans, dividers } = savedCase;
+  return request("POST", "/cases", { name, author: author || "", caseWidth, pans, dividers, products: placedProducts(pans, products) });
 }
 
 export function fetchPublicCases(page = 0, search = "") {
@@ -37,8 +38,9 @@ export async function deletePublicCase(shortCode) {
   await request("DELETE", `/cases/${encodeURIComponent(shortCode)}`);
 }
 
-export async function updatePublicCase(shortCode, pans, products, caseWidth) {
-  await request("PUT", `/cases/${encodeURIComponent(shortCode)}`, { caseWidth, pans, products: placedProducts(pans, products) });
+export async function updatePublicCase(shortCode, layout, products) {
+  const { caseWidth, pans, dividers } = layout;
+  await request("PUT", `/cases/${encodeURIComponent(shortCode)}`, { caseWidth, pans, dividers, products: placedProducts(pans, products) });
 }
 
 // ─── Shared Product Catalog ───────────────────────────────────────────────────

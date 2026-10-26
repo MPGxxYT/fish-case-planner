@@ -1,4 +1,5 @@
 import { placedProducts } from "../case/queries.js";
+import { readSavedCase } from "../case/savedCase.js";
 
 const FILE_VERSION = 1;
 const FILE_EXT = ".fishcase";
@@ -13,6 +14,7 @@ export const exportCaseToFile = (savedCase, products) => {
       name: savedCase.name,
       caseWidth: savedCase.caseWidth,
       pans: savedCase.pans,
+      dividers: savedCase.dividers || [],
       savedAt: savedCase.savedAt,
     },
     products: usedProducts,
@@ -37,31 +39,17 @@ export const exportCurrentCaseToFile = (name, pans, caseWidth, products) => {
   );
 };
 
-const VALID_WIDTHS = new Set([3, 6, 8, 12]);
-const VALID_DEPTHS = new Set(["full", "half", "third"]);
-const VALID_PAN_TYPES = new Set(["deep", "shallow"]);
-
-const validateImport = (data) => {
-  if (!data || typeof data !== "object") return "File is not valid JSON.";
-  if (typeof data.version !== "number") return "Missing file version.";
-  if (!data.case) return "Missing case data.";
-  const c = data.case;
-  if (!c.name || typeof c.name !== "string") return "Case is missing a name.";
-  if (!Number.isInteger(c.caseWidth) || c.caseWidth < 1) return "Invalid case width.";
-  if (!Array.isArray(c.pans)) return "Case is missing pans array.";
-  for (let i = 0; i < c.pans.length; i++) {
-    const pan = c.pans[i];
-    if (!pan.id || !VALID_WIDTHS.has(pan.width)) return `Pan ${i + 1} has an invalid width.`;
-    if (!VALID_DEPTHS.has(pan.depth)) return `Pan ${i + 1} has an invalid depth.`;
-    if (!VALID_PAN_TYPES.has(pan.panType)) return `Pan ${i + 1} has an invalid pan type.`;
-    if (!pan.slots || typeof pan.slots !== "object") return `Pan ${i + 1} is missing slots.`;
-  }
-  if (!Array.isArray(data.products)) return "Missing products array.";
+// The .fishcase wrapper (version, products) is checked here; the case itself by readSavedCase.
+const readImport = (data) => {
+  if (!data || typeof data !== "object") return { error: "File is not valid JSON." };
+  if (typeof data.version !== "number") return { error: "Missing file version." };
+  if (!Array.isArray(data.products)) return { error: "Missing products array." };
   for (let i = 0; i < data.products.length; i++) {
     const p = data.products[i];
-    if (!p.id || !p.name) return `Product ${i + 1} is missing id or name.`;
+    if (!p.id || !p.name) return { error: `Product ${i + 1} is missing id or name.` };
   }
-  return null;
+  const { case: savedCase, error } = readSavedCase(data.case);
+  return error ? { error } : { data: { ...data, case: savedCase } };
 };
 
 export const readCaseFile = (file) => {
@@ -70,9 +58,9 @@ export const readCaseFile = (file) => {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        const error = validateImport(data);
+        const { data: checked, error } = readImport(data);
         if (error) return reject(new Error(error));
-        resolve(data);
+        resolve(checked);
       } catch {
         reject(new Error("Could not parse file. Make sure it's a valid .fishcase file."));
       }

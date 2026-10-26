@@ -4,11 +4,13 @@
 //   GET    /api/cases?page=0&search=   newest published cases
 //   POST   /api/cases                  publish, answers { shortCode }
 //   GET    /api/cases/:code            one case
-//   PUT    /api/cases/:code            replace its pans, products and width
+//   PUT    /api/cases/:code            replace its pans, dividers, products and width
 //   DELETE /api/cases/:code
 //   GET    /api/products               the shared catalog
 //   PUT    /api/products/:id           add or replace a product
 //   DELETE /api/products/:id
+
+import { checkLayout, cleanDividers } from "./caseShape.js";
 
 const MAX_BODY = 1_000_000; // bytes; a full case is a few kilobytes
 
@@ -79,13 +81,15 @@ function normalizeCode(code) {
 async function readCase(req, { named }) {
   const body = await readJson(req);
   if (named && (typeof body?.name !== "string" || !body.name.trim())) throw new HttpError(400, "A case needs a name.");
-  if (!Array.isArray(body?.pans) || !Array.isArray(body?.products)) throw new HttpError(400, "A case needs pans and products.");
-  if (!Number.isFinite(body.caseWidth)) throw new HttpError(400, "A case needs a width.");
+  if (!Array.isArray(body?.products)) throw new HttpError(400, "A case needs pans and products.");
+  const problem = checkLayout(body);
+  if (problem) throw new HttpError(400, problem);
   return {
     name: named ? body.name.trim() : undefined,
     author: typeof body.author === "string" ? body.author.trim() : "",
     caseWidth: body.caseWidth,
     pans: body.pans,
+    dividers: cleanDividers(body.pans, body.dividers),
     products: body.products,
   };
 }

@@ -102,9 +102,12 @@ interface SavedCase {
   name: string;
   pans: Pan[];
   caseWidth: number;
+  dividers: string[];  // "start" or the id of the pan each divider follows
   savedAt: string;  // ISO date
 }
 ```
+
+Every case that comes in (local save, `.fishcase` file, published case) goes through `readSavedCase` in `src/case/savedCase.js`, which checks it with `api/caseShape.js`, the same rules the API applies before storing one.
 
 ## Features & Behavior
 

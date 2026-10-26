@@ -190,7 +190,7 @@ export function applyEdit(layout, edit, { makeId = uid } = {}) {
     }
 
     case "replaceLayout":
-      return { pans: edit.pans, caseWidth: edit.caseWidth, dividers: [] };
+      return { pans: edit.pans, caseWidth: edit.caseWidth, dividers: edit.dividers ?? [] };
 
     default:
       return layout;

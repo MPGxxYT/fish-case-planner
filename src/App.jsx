@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { T, S, FONT, DFONT, PRODUCT_COLORS } from "./utils/constants.js";
 import { checkFit, clampCaseWidth, usedWidth as sumWidth } from "./case/layout.js";
 import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
+import { toSavedCase, readSavedCase } from "./case/savedCase.js";
 import { fetchPublicProducts, upsertPublicProduct, deletePublicProduct } from "./lib/api.js";
 import { autoGenerateCase } from "./utils/autoGenerate.js";
 import { dropToEdit } from "./case/drop.js";
@@ -122,7 +123,7 @@ export default function App() {
     dispatch({ type: "clearSlot", panId: clearSlotConfirm.panId, slot: clearSlotConfirm.slotIdx });
     setClearSlotConfirm(null);
   };
-  const replaceLayout = (newPans, newCaseWidth) => dispatch({ type: "replaceLayout", pans: newPans, caseWidth: newCaseWidth });
+  const replaceLayout = (newPans, newCaseWidth, dividers = []) => dispatch({ type: "replaceLayout", pans: newPans, caseWidth: newCaseWidth, dividers });
 
   // Every drop (mouse, touch, or tap-to-place on mobile) lands here. A function
   // declaration so useCaseDrag above can take it before this line runs.
@@ -153,38 +154,37 @@ export default function App() {
   const handleGenerate = (items, w) => { replaceLayout(autoGenerateCase(items, w), w); setShowAutoGen(false); };
   const saveCase = () => {
     if (!saveName.trim()) return;
-    setSavedCases((sc) => [...sc, { name: saveName.trim(), pans: JSON.parse(JSON.stringify(pans)), caseWidth, savedAt: new Date().toISOString() }]);
+    setSavedCases((sc) => [...sc, toSavedCase(layout, saveName.trim())]);
     setSaveName("");
     setShowSaveInput(false);
   };
-  const loadCase = (c) => { replaceLayout(c.pans, c.caseWidth); setShowSaved(false); showToast(`Loaded "${c.name}"`); };
+  // Local and Published Cases load the same way.
+  const loadCase = (c) => {
+    const { case: saved, error } = readSavedCase(c);
+    if (error) { showToast(`Couldn't load "${c.name}": ${error}`); return; }
+    replaceLayout(saved.pans, saved.caseWidth, saved.dividers);
+    setShowSaved(false);
+    showToast(`Loaded "${saved.name}"`);
+  };
   const deleteCase = (idx) => setSavedCases((sc) => sc.filter((_, i) => i !== idx));
   const updateLocalCase = (idx) => {
-    setSavedCases((sc) => sc.map((c, i) => i === idx ? { ...c, pans: JSON.parse(JSON.stringify(pans)), caseWidth, savedAt: new Date().toISOString() } : c));
+    setSavedCases((sc) => sc.map((c, i) => i === idx ? toSavedCase(layout, c.name) : c));
     showToast("Save updated");
   };
   const exportCase = (c) => exportCaseToFile(c, products);
   const importCaseFile = async (file) => {
     try {
       const data = await readCaseFile(file);
-      // Products live in the shared DB — no merging needed, just load the layout
-      setSavedCases((sc) => [...sc, {
-        name: data.case.name,
-        pans: data.case.pans,
-        caseWidth: data.case.caseWidth,
-        savedAt: data.case.savedAt || new Date().toISOString(),
-      }]);
+      // Products live in the shared catalog, so only the case is kept
+      setSavedCases((sc) => [...sc, data.case]);
     } catch (err) {
       alert(err.message);
     }
   };
-  const loadPublicCase = (c) => {
-    replaceLayout(c.pans, c.caseWidth);
-    setShowSaved(false);
-    showToast(`Loaded "${c.name}"`);
-  };
   const savePublicToLocal = (c) => {
-    setSavedCases((sc) => [...sc, { name: c.name, pans: c.pans, caseWidth: c.caseWidth, savedAt: new Date().toISOString() }]);
+    const { case: saved, error } = readSavedCase(c);
+    if (error) { showToast(`Couldn't save "${c.name}": ${error}`); return; }
+    setSavedCases((sc) => [...sc, { ...saved, savedAt: new Date().toISOString() }]);
     showToast(`Saved "${c.name}" to local`);
   };
 
@@ -344,7 +344,7 @@ export default function App() {
       {showProductManager && <ProductManagerModal products={products} onSave={handleProductSave} onDelete={deleteProduct} onClose={() => setShowProductManager(false)} />}
       {showAutoGen && <AutoGenModal products={products} savedCases={savedCases} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
-      {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadPublicCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentPans={pans} currentCaseWidth={caseWidth} onClose={() => setShowSaved(false)} />}
+      {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentLayout={layout} onClose={() => setShowSaved(false)} />}
       {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { replaceLayout([], caseWidth); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
       {confirmRemovePan && <ConfirmDialog message="Remove this pan? Any products in its slots will be unassigned." onConfirm={confirmRemovePanAction} onCancel={() => setConfirmRemovePan(null)} confirmLabel="Remove" />}
       {clearSlotConfirm && <ConfirmDialog message="Remove product from this slot? Consider editing instead if this was a mistake." onConfirm={confirmClearSlotAction} onCancel={() => setClearSlotConfirm(null)} confirmLabel="Remove" />}

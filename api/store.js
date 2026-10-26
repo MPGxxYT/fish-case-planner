@@ -3,7 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 // Published cases and the shared product catalog, kept in one SQLite file.
-// Pans and products are stored as JSON text exactly as the app sends them.
+// Pans, dividers and products are stored as JSON text exactly as the app sends them.
 
 export const PAGE_SIZE = 20;
 
@@ -35,6 +35,10 @@ export function openStore(path, { makeCode = generateShortCode } = {}) {
       data TEXT NOT NULL
     );
   `);
+  // Cases published before dividers were stored get an empty list.
+  if (!db.prepare("PRAGMA table_info(published_cases)").all().some((c) => c.name === "dividers")) {
+    db.exec("ALTER TABLE published_cases ADD COLUMN dividers TEXT NOT NULL DEFAULT '[]'");
+  }
 
   const toCase = (row) => ({
     shortCode: row.short_code,
@@ -42,22 +46,23 @@ export function openStore(path, { makeCode = generateShortCode } = {}) {
     author: row.author,
     caseWidth: row.case_width,
     pans: JSON.parse(row.pans),
+    dividers: JSON.parse(row.dividers),
     products: JSON.parse(row.products),
     createdAt: row.created_at,
   });
 
   const insertCase = db.prepare(`
-    INSERT INTO published_cases (short_code, name, author, case_width, pans, products, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO published_cases (short_code, name, author, case_width, pans, dividers, products, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   return {
     // Returns the new short code. Tries a few codes in case one is taken.
-    publishCase({ name, author, caseWidth, pans, products, createdAt = new Date().toISOString() }) {
+    publishCase({ name, author, caseWidth, pans, dividers = [], products, createdAt = new Date().toISOString() }) {
       for (let attempt = 0; attempt < 3; attempt++) {
         const code = makeCode();
         try {
-          insertCase.run(code, name, author || "", caseWidth, JSON.stringify(pans), JSON.stringify(products), createdAt);
+          insertCase.run(code, name, author || "", caseWidth, JSON.stringify(pans), JSON.stringify(dividers), JSON.stringify(products), createdAt);
           return code;
         } catch (err) {
           if (err.errcode !== 1555) throw err; // SQLITE_CONSTRAINT_PRIMARYKEY
@@ -67,11 +72,11 @@ export function openStore(path, { makeCode = generateShortCode } = {}) {
     },
 
     // For api/import.js: keeps the case's own code and date.
-    importCase({ shortCode, name, author, caseWidth, pans, products, createdAt }) {
+    importCase({ shortCode, name, author, caseWidth, pans, dividers = [], products, createdAt }) {
       db.prepare(`
-        INSERT OR REPLACE INTO published_cases (short_code, name, author, case_width, pans, products, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(shortCode, name, author, caseWidth, JSON.stringify(pans), JSON.stringify(products), createdAt);
+        INSERT OR REPLACE INTO published_cases (short_code, name, author, case_width, pans, dividers, products, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(shortCode, name, author, caseWidth, JSON.stringify(pans), JSON.stringify(dividers), JSON.stringify(products), createdAt);
     },
 
     // Newest first, PAGE_SIZE at a time, optionally matching name or author.
@@ -92,10 +97,10 @@ export function openStore(path, { makeCode = generateShortCode } = {}) {
     },
 
     // Returns false when no case has that code.
-    updateCase(code, { caseWidth, pans, products }) {
+    updateCase(code, { caseWidth, pans, dividers = [], products }) {
       const result = db
-        .prepare("UPDATE published_cases SET case_width = ?, pans = ?, products = ? WHERE short_code = ?")
-        .run(caseWidth, JSON.stringify(pans), JSON.stringify(products), code);
+        .prepare("UPDATE published_cases SET case_width = ?, pans = ?, dividers = ?, products = ? WHERE short_code = ?")
+        .run(caseWidth, JSON.stringify(pans), JSON.stringify(dividers), JSON.stringify(products), code);
       return result.changes > 0;
     },
 

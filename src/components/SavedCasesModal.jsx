@@ -46,7 +46,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
     setPublishing(true);
     setPublishResult(null);
     try {
-      const { shortCode } = await publishCase(c.name, publishAuthor, c.pans, products, c.caseWidth);
+      const { shortCode } = await publishCase(c, publishAuthor, products);
       setPublishResult({ idx: i, shortCode });
       setPublishIdx(null);
     } catch (err) {
@@ -180,7 +180,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
 
 /* ── Public tab ── */
 
-function PublicTab({ products: localProducts, onLoadPublic, onClose, currentPans, currentCaseWidth, onSavePublicToLocal }) {
+function PublicTab({ products: localProducts, onLoadPublic, onClose, currentLayout, onSavePublicToLocal }) {
   const [cases, setCases] = useState([]);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -228,7 +228,7 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentPans
     setUpdating(true);
     setUpdateError(null);
     try {
-      await updatePublicCase(c.shortCode, currentPans, localProducts, currentCaseWidth);
+      await updatePublicCase(c.shortCode, currentLayout, localProducts);
       const updated = await fetchCaseByCode(c.shortCode);
       setCases((prev) => prev.map((x) => x.shortCode === c.shortCode ? updated : x));
       setUpdateCode(null);
@@ -441,7 +441,7 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentPans
 
 /* ── Main modal ── */
 
-export default function SavedCasesModal({ savedCases, products, onLoad, onDelete, onExport, onImport, onLoadPublic, onUpdateLocal, onSavePublicToLocal, currentPans, currentCaseWidth, onClose }) {
+export default function SavedCasesModal({ savedCases, products, onLoad, onDelete, onExport, onImport, onLoadPublic, onUpdateLocal, onSavePublicToLocal, currentLayout, onClose }) {
   const [tab, setTab] = useState("local");
 
   return (
@@ -467,7 +467,7 @@ export default function SavedCasesModal({ savedCases, products, onLoad, onDelete
           <PublicTab
             products={products} onLoadPublic={onLoadPublic}
             onSavePublicToLocal={onSavePublicToLocal}
-            currentPans={currentPans} currentCaseWidth={currentCaseWidth}
+            currentLayout={currentLayout}
             onClose={onClose}
           />
         )}
