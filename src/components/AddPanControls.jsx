@@ -17,6 +17,8 @@ export default function AddPanControls({ onAddPan, remainingWidth, dividerEditMo
   const { isMobile } = useIsMobile();
 
   const ad = canSplitDepth(w) ? PAN_DEPTHS_SPLIT : ["full"];
+  // Phones get 44px tap targets.
+  const tap = isMobile ? { minHeight: 44, minWidth: 44, fontSize: 13 } : {};
 
   useEffect(() => {
     if (!canSplitDepth(w)) setD("full");
@@ -83,32 +85,34 @@ export default function AddPanControls({ onAddPan, remainingWidth, dividerEditMo
             ⌨
           </button>
         )}
-        <div
-          draggable={dividerEditMode}
-          onDragStart={(e) => { if (!dividerEditMode) { e.preventDefault(); return; } setDragSource(e, { kind: "divider" }); }}
-          title={dividerEditMode ? "Drag into a gap between pans to place a divider" : "Tap Dividers below the case first"}
-          style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 5, border: `1px solid ${T.border}`, background: T.surface, cursor: dividerEditMode ? "grab" : "not-allowed", userSelect: "none", opacity: dividerEditMode ? 1 : 0.4 }}
-        >
-          <div style={{ width: 3, height: 18, background: DIVIDER_COLOR, borderRadius: 1, flexShrink: 0 }} />
-          <span style={{ fontSize: 10, color: T.textDim, fontFamily: FONT }}>Divider</span>
-        </div>
-        <button style={{ ...S.bp, opacity: w > remainingWidth ? 0.3 : 1, fontSize: 12, padding: "5px 14px" }} disabled={w > remainingWidth} onClick={() => onAddPan(w, d, pt)}>+ Add</button>
+        {dividerEditMode && (
+          <div
+            draggable
+            onDragStart={(e) => setDragSource(e, { kind: "divider" })}
+            title="Drag into a gap between pans to place a divider"
+            style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 5, border: `1px solid ${T.border}`, background: T.surface, cursor: "grab", userSelect: "none" }}
+          >
+            <div style={{ width: 3, height: 18, background: DIVIDER_COLOR, borderRadius: 1, flexShrink: 0 }} />
+            <span style={{ fontSize: 10, color: T.textMuted, fontFamily: FONT }}>Divider</span>
+          </div>
+        )}
+        <button style={{ ...S.bp, opacity: w > remainingWidth ? 0.3 : 1, fontSize: 12, padding: "5px 14px", ...tap }} disabled={w > remainingWidth} onClick={() => onAddPan(w, d, pt)}>+ Add</button>
         <span style={{ fontSize: 11, color: T.textMuted, fontFamily: FONT, fontWeight: 700 }}>Pan</span>
         <div style={{ display: "flex", gap: 3 }}>
           {PAN_WIDTHS.map((v) => (
-            <button key={v} onClick={() => setW(v)} style={{ ...S.ch, background: w === v ? T.accent : T.surface, color: w === v ? T.bg : T.textMuted, fontWeight: w === v ? 800 : 500 }}>{v}</button>
+            <button key={v} onClick={() => setW(v)} style={{ ...S.ch, ...tap, background: w === v ? T.accent : T.surface, color: w === v ? T.bg : T.textMuted, fontWeight: w === v ? 800 : 500 }}>{v}</button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 3 }}>
           {ad.map((v) => (
-            <button key={v} onClick={() => setD(v)} style={{ ...S.ch, fontSize: 10, background: d === v ? T.accent : T.surface, color: d === v ? T.bg : T.textMuted }}>
+            <button key={v} onClick={() => setD(v)} style={{ ...S.ch, fontSize: 10, ...tap, background: d === v ? T.accent : T.surface, color: d === v ? T.bg : T.textMuted }}>
               {v === "full" ? "Full" : v === "half" ? "Half" : "Third"}
             </button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 3 }}>
           {["shallow", "deep"].map((v) => (
-            <button key={v} onClick={() => setPt(v)} style={{ ...S.ch, fontSize: 10, background: pt === v ? (v === "deep" ? "#3b82f6" : "#f59e0b") : T.surface, color: pt === v ? "#fff" : T.textMuted }}>
+            <button key={v} onClick={() => setPt(v)} style={{ ...S.ch, fontSize: 10, ...tap, background: pt === v ? (v === "deep" ? "#3b82f6" : "#f59e0b") : T.surface, color: pt === v ? T.bg : T.textMuted }}>
               {v === "shallow" ? "Shallow" : "Deep"}
             </button>
           ))}

@@ -21,6 +21,7 @@ import SavedCasesModal from "./components/SavedCasesModal.jsx";
 import CaseGrid from "./components/CaseGrid.jsx";
 import SlotPickerModal from "./components/SlotPickerModal.jsx";
 import ProductManagerModal from "./components/ProductManagerModal.jsx";
+import PanSheet from "./components/PanSheet.jsx";
 
 export default function App() {
   const catalog = useProductCatalog();
@@ -42,6 +43,7 @@ export default function App() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [confirmExpand, setConfirmExpand] = useState(null); // { edit, requiredWidth, product? }
   const [slotPicker, setSlotPicker] = useState(null); // { panId, slotIdx }
+  const [panSheetId, setPanSheetId] = useState(null);
   const [toast, setToast] = useState(null); // { msg, undoable }
   const showToast = (msg, { undoable = false } = {}) => {
     const t = { msg, undoable };
@@ -77,6 +79,8 @@ export default function App() {
   const selectedProduct = selectedProductId ? products.find((p) => p.id === selectedProductId) : null;
 
   const { isMobile, isPortrait } = useIsMobile();
+  const tap = isMobile ? { minHeight: 44, minWidth: 44, fontSize: 13 } : {};
+  const barHeight = isMobile ? 56 : 48;
   const drag = useCaseDrag(handleDrop);
 
   const usedWidth = sumWidth(pans);
@@ -222,12 +226,12 @@ export default function App() {
           <h1 style={{ margin: 0, fontSize: 16, fontWeight: 800, fontFamily: DFONT, background: `linear-gradient(135deg,${T.accent},#818cf8)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Case Planner</h1>
         </div>
         <div style={{ flex: 1 }} />
-        <button style={S.hb} onClick={() => setShowAutoGen(true)}>⚡ Auto</button>
-        <button style={S.hb} onClick={() => setShowSaved(true)}>📁 Saved</button>
-        <button style={S.hb} onClick={() => setShowPrint(true)}>🖨 Print</button>
+        <button style={{ ...S.hb, ...tap }} onClick={() => setShowAutoGen(true)}>⚡ Auto</button>
+        <button style={{ ...S.hb, ...tap }} onClick={() => setShowSaved(true)}>📁 Saved</button>
+        <button style={{ ...S.hb, ...tap }} onClick={() => setShowPrint(true)}>🖨 Print</button>
       </header>
 
-      <main style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? (drawerOpen ? "calc(58vh + 14px)" : 66) : (drawerOpen ? "calc(45vh + 14px)" : 62) }}>
+      <main style={{ padding: 14, display: "flex", flexDirection: "column", gap: 10, paddingBottom: isMobile ? (drawerOpen ? "calc(58vh + 14px)" : barHeight + 18) : (drawerOpen ? "calc(45vh + 14px)" : barHeight + 14) }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: T.textMuted }}>
             Case:<input
@@ -237,7 +241,7 @@ export default function App() {
               onChange={(e) => setCaseWidthDraft(e.target.value)}
               onBlur={(e) => { caseWidthFocused.current = false; commitCaseWidth(e.target.value); }}
               onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
-              style={{ ...S.inp, width: 55, textAlign: "center", padding: "4px 6px" }}
+              style={{ ...S.inp, width: 60, textAlign: "center", padding: "4px 6px", ...(isMobile && { minHeight: 44, fontSize: 16 }) }}
             />
           </label>
           <span style={{ fontSize: 11, fontFamily: FONT, padding: "3px 8px", borderRadius: 4, background: remainingWidth < 0 ? T.danger + "33" : T.accentDim + "33", color: remainingWidth < 0 ? T.danger : T.accent }}>
@@ -245,16 +249,17 @@ export default function App() {
           </span>
           {showSaveInput ? (
             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-              <input style={{ ...S.inp, width: 130, fontSize: 11, padding: "4px 8px" }} value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Case name..." onKeyDown={(e) => e.key === "Enter" && saveCase()} autoFocus />
-              <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={saveCase}>Save</button>
-              <button style={S.ch} onClick={() => setShowSaveInput(false)}>×</button>
+              <input style={{ ...S.inp, width: 130, fontSize: 11, padding: "4px 8px", ...(isMobile && { minHeight: 44, fontSize: 16 }) }} value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Case name..." onKeyDown={(e) => e.key === "Enter" && saveCase()} autoFocus />
+              <button style={{ ...S.ch, ...tap, background: T.accent, color: T.bg }} onClick={saveCase}>Save</button>
+              <button style={{ ...S.ch, ...tap }} aria-label="Cancel" onClick={() => setShowSaveInput(false)}>×</button>
             </div>
           ) : (
-            <button style={S.ch} onClick={() => setShowSaveInput(true)}>💾 Save</button>
+            <button style={{ ...S.ch, ...tap }} onClick={() => setShowSaveInput(true)}>💾 Save</button>
           )}
-          <button style={{ ...S.ch, color: T.danger }} onClick={() => setConfirmClear(true)}>🗑 Clear</button>
-          <button style={{ ...S.ch, opacity: canUndo ? 1 : 0.35 }} disabled={!canUndo} onClick={undo}>↩ Undo</button>
-          <button style={{ ...S.ch, opacity: canRedo ? 1 : 0.35 }} disabled={!canRedo} onClick={redo}>↪ Redo</button>
+          <button style={{ ...S.ch, ...tap, color: T.danger }} onClick={() => setConfirmClear(true)}>🗑 Clear</button>
+          {/* On phones Undo/Redo live in the bottom bar, within thumb reach */}
+          {!isMobile && <button style={{ ...S.ch, opacity: canUndo ? 1 : 0.35 }} disabled={!canUndo} onClick={undo}>↩ Undo</button>}
+          {!isMobile && <button style={{ ...S.ch, opacity: canRedo ? 1 : 0.35 }} disabled={!canRedo} onClick={redo}>↪ Redo</button>}
         </div>
 
         <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} dividerEditMode={dividerEditMode} />
@@ -262,8 +267,7 @@ export default function App() {
         <CaseGrid
           pans={pans} products={products} caseWidth={caseWidth}
           onDrop={handleDrop} drag={drag}
-          onRemovePan={handleRemovePanClick} onSetPanType={setPanType} onSetSlotType={setSlotType}
-          onSetPanWidth={setPanWidth} onSetPanDepth={setPanDepth}
+          onOpenPanSheet={setPanSheetId}
           isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
           selectedProductId={selectedProductId} onPickProduct={handlePickProduct}
           dividers={dividers}
@@ -281,7 +285,7 @@ export default function App() {
       {/* Product pool — fixed bottom bar for both desktop and mobile */}
       {isMobile && selectedProduct && !drawerOpen && (
         <div style={{
-          position: "fixed", bottom: 44, left: 0, right: 0, zIndex: 299,
+          position: "fixed", bottom: barHeight, left: 0, right: 0, zIndex: 299,
           background: T.accent, padding: "8px 14px",
           display: "flex", alignItems: "center", gap: 8,
         }}>
@@ -290,7 +294,8 @@ export default function App() {
           </span>
           <button
             onClick={() => setSelectedProductId(null)}
-            style={{ background: "none", border: "none", color: T.bg, fontSize: 18, cursor: "pointer", padding: "0 2px", lineHeight: 1, opacity: 0.8 }}
+            aria-label="Stop placing"
+            style={{ background: "none", border: "none", color: T.bg, fontSize: 20, cursor: "pointer", minWidth: 44, minHeight: 36, lineHeight: 1, opacity: 0.8 }}
           >×</button>
         </div>
       )}
@@ -298,16 +303,25 @@ export default function App() {
         position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 300,
         background: T.surface, borderTop: `1px solid ${T.borderLight}`,
         borderRadius: "12px 12px 0 0",
-        height: drawerOpen ? (isMobile ? "58vh" : "45vh") : 48,
+        height: drawerOpen ? (isMobile ? "58vh" : "45vh") : barHeight,
         transition: "height 0.25s ease",
         display: "flex", flexDirection: "column", overflow: "hidden",
       }}>
         {/* Handle bar */}
         <div
           onClick={() => setDrawerOpen((o) => !o)}
-          style={{ height: 48, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 16px", cursor: "pointer", touchAction: "manipulation", position: "relative" }}
+          style={{ height: barHeight, flexShrink: 0, display: "flex", alignItems: "center", gap: 6, padding: isMobile ? "0 8px" : "0 16px", cursor: "pointer", touchAction: "manipulation" }}
         >
+          <div style={{ flex: 1, display: "flex", gap: 4 }}>
+            {isMobile && (
+              <>
+                <button style={{ ...S.hb, ...tap, fontSize: 18, opacity: canUndo ? 1 : 0.35 }} disabled={!canUndo} aria-label="Undo" onClick={(e) => { e.stopPropagation(); undo(); }}>↩</button>
+                <button style={{ ...S.hb, ...tap, fontSize: 18, opacity: canRedo ? 1 : 0.35 }} disabled={!canRedo} aria-label="Redo" onClick={(e) => { e.stopPropagation(); redo(); }}>↪</button>
+              </>
+            )}
+          </div>
           <span style={{
+            flexShrink: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             fontSize: isMobile ? 12 : 14,
             color: isMobile && selectedProductId ? T.accent : T.textMuted,
             fontFamily: isMobile ? FONT : DFONT,
@@ -318,14 +332,15 @@ export default function App() {
           }}>
             {isMobile && selectedProductId ? `${selectedProduct?.name} selected` : "Products"} {drawerOpen ? "▼" : "▲"}
           </span>
-          <div style={{ position: "absolute", right: 16, display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ flex: 1, display: "flex", gap: 4, alignItems: "center", justifyContent: "flex-end" }}>
             <button
-              style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 8px" : "5px 10px", opacity: catalog.refreshing ? 0.5 : 1 }}
+              style={{ ...S.hb, fontSize: 12, padding: "5px 10px", ...tap, opacity: catalog.refreshing ? 0.5 : 1 }}
               onClick={(e) => { e.stopPropagation(); refreshProducts(); }}
               title="Refresh product list from database"
+              aria-label="Refresh products"
               disabled={catalog.refreshing}
             >⟳ {!isMobile && "Refresh"}</button>
-            <button style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 10px" : "5px 14px" }} onClick={(e) => { e.stopPropagation(); setShowProductManager(true); }}>Manage</button>
+            <button style={{ ...S.hb, fontSize: 12, padding: isMobile ? "5px 10px" : "5px 14px", ...tap }} onClick={(e) => { e.stopPropagation(); setShowProductManager(true); }}>Manage</button>
           </div>
         </div>
         {/* Pool content — always mounted so drag source elements stay in DOM */}
@@ -346,6 +361,22 @@ export default function App() {
           />
         ) : null;
       })()}
+      {panSheetId && (() => {
+        const i = pans.findIndex((p) => p.id === panSheetId);
+        if (i === -1) return null;
+        const pan = pans[i];
+        return (
+          <PanSheet
+            pan={pan} position={i + 1} remainingWidth={remainingWidth}
+            onSetWidth={(w) => setPanWidth(pan.id, w)}
+            onSetDepth={(d) => setPanDepth(pan.id, d)}
+            onSetPanType={(t) => setPanType(pan.id, t)}
+            onSetSlotType={(slot, t) => setSlotType(pan.id, slot, t)}
+            onRemove={() => { handleRemovePanClick(pan.id); setPanSheetId(null); }}
+            onClose={() => setPanSheetId(null)}
+          />
+        );
+      })()}
       {showProductManager && <ProductManagerModal products={products} onSave={handleProductSave} onDelete={deleteProduct} onClose={() => setShowProductManager(false)} />}
       {showAutoGen && <AutoGenModal products={products} savedCases={savedCases} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
@@ -361,7 +392,7 @@ export default function App() {
       />}
       {toast && (
         <div role="status" style={{
-          position: "fixed", bottom: isMobile ? 56 : 20, left: "50%", transform: "translateX(-50%)",
+          position: "fixed", bottom: barHeight + 8, left: "50%", transform: "translateX(-50%)",
           background: T.surface, color: T.text, border: `1px solid ${T.borderLight}`,
           padding: toast.undoable ? "0 0 0 16px" : "8px 20px", borderRadius: 8, fontSize: 13, fontFamily: DFONT, fontWeight: 600,
           boxShadow: "0 4px 16px rgba(0,0,0,0.4)", zIndex: 9999,

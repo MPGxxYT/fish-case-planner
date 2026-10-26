@@ -4,7 +4,7 @@ import { getSlotLabel } from "../utils/helpers.js";
 import { setDragSource, getDragSource, dragKind } from "../utils/dragData.js";
 import { canDrop } from "../case/drop.js";
 
-export default function PanSlot({ pan, slotIdx, products, onDrop, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onPickProduct }) {
+export default function PanSlot({ pan, slotIdx, products, onDrop, totalDepthSlots, startTouchDrag, selectedProductId, onPickProduct }) {
   const [dOver, setDOver] = useState(false);
   const slotRef = useRef();
   const product = pan.slots[slotIdx] ? products.find((p) => p.id === pan.slots[slotIdx]) : null;
@@ -90,14 +90,13 @@ export default function PanSlot({ pan, slotIdx, products, onDrop, onSetSlotType,
       {/* Per-slot deep/shallow badge for split pans */}
       {isSplit && (
         <span
-          onClick={(e) => { e.stopPropagation(); onSetSlotType(pan.id, slotIdx, slotType === "deep" ? "shallow" : "deep"); }}
+          aria-hidden="true"
           style={{
             position: "absolute", bottom: 2, right: 3,
-            fontSize: 10, padding: "0 3px", borderRadius: 2, cursor: "pointer", fontFamily: FONT, textTransform: "uppercase",
+            fontSize: 10, padding: "0 3px", borderRadius: 2, fontFamily: FONT, textTransform: "uppercase",
             background: slotType === "deep" ? "#3b82f622" : "#f59e0b22",
             color: slotType === "deep" ? "#60a5fa" : "#fbbf24",
           }}
-          title="Toggle deep/shallow for this slot"
         >
           {slotType === "deep" ? "D" : "S"}
         </span>

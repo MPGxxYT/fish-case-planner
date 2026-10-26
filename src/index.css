@@ -56,3 +56,17 @@ body.touch-dragging {
   from { opacity: 0; transform: translateX(-50%) translateY(8px); }
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
+
+/* Touch screens: every control inside these surfaces gets a 44px hit area,
+   and inputs use 16px text so iOS does not zoom in on focus. */
+@media (pointer: coarse) {
+  .touch-sized button,
+  .touch-sized input,
+  .touch-sized select {
+    min-height: 44px;
+  }
+  .touch-sized input,
+  .touch-sized select {
+    font-size: 16px !important;
+  }
+}

@@ -52,6 +52,8 @@ function InsertZone({ idx, afterPanId, hoverInsertIdx, setHoverInsertIdx, hoverD
         cursor: isPanDragging ? "copy" : canToggleDivider ? "pointer" : "default",
       }}
     >
+      {/* While editing dividers, a 44px tap area centered on the gap */}
+      {canToggleDivider && <div aria-hidden="true" style={{ position: "absolute", top: 0, bottom: 0, left: "50%", width: 44, transform: "translateX(-50%)" }} />}
       {/* Existing divider bar */}
       {hasDivider && (
         <div style={{
@@ -99,7 +101,7 @@ function getPanSummary(pans) {
   return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onDrop, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, drag, isMobile, isPortrait, startTouchDrag, selectedProductId, onPickProduct, dividers = new Set(), dividerEditMode = false, onToggleDividerEditMode }) {
+export default function CaseGrid({ pans, products, caseWidth, onDrop, onOpenPanSheet, drag, isMobile, isPortrait, startTouchDrag, selectedProductId, onPickProduct, dividers = new Set(), dividerEditMode = false, onToggleDividerEditMode }) {
   const { insertTarget, panDragId } = drag;
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
@@ -181,11 +183,9 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onRemovePa
                 {pans.map((pan, i) => (
                   <span key={pan.id} style={{ display: "contents" }}>
                     <PanColumn
-                      pan={pan} products={products}
+                      pan={pan} position={i + 1} products={products}
                       onDrop={onDrop}
-                      unitSize={unitSize} onRemovePan={onRemovePan} onSetPanType={onSetPanType}
-                      onSetSlotType={onSetSlotType} onSetPanWidth={onSetPanWidth} onSetPanDepth={onSetPanDepth}
-                      remainingWidth={remainingWidth}
+                      unitSize={unitSize} onOpenPanSheet={onOpenPanSheet}
                       insertIndicator={insertTarget?.panId === pan.id ? insertTarget.side : null}
                       drag={drag}
                       startTouchDrag={startTouchDrag} isMobile={isMobile}
@@ -227,7 +227,7 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onRemovePa
           </div>
 
           {/* "Top Of Case" label below, with a small tab to toggle divider editing */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginTop: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", position: "relative", marginTop: 4, minHeight: isMobile ? 44 : undefined }}>
             <span style={{ fontSize: 10, color: T.textDim, fontFamily: FONT, textTransform: "uppercase", letterSpacing: 1 }}>Top Of Case</span>
             {onToggleDividerEditMode && (
               <button
@@ -237,7 +237,7 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onRemovePa
                 style={{
                   position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
                   display: "flex", alignItems: "center", gap: 4,
-                  fontSize: 9, padding: "3px 8px", borderRadius: 5, cursor: "pointer",
+                  fontSize: isMobile ? 12 : 9, padding: "3px 8px", minHeight: isMobile ? 44 : undefined, borderRadius: 5, cursor: "pointer",
                   fontFamily: FONT, fontWeight: 700, letterSpacing: 0.3,
                   border: `1px solid ${dividerEditMode ? T.accent : T.border}`,
                   background: dividerEditMode ? T.accent : T.surfaceAlt,
