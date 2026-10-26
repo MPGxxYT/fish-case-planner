@@ -89,7 +89,7 @@ export default function PanSheet({ pan, position, remainingWidth, onSetWidth, on
   );
 }
 
-function Group({ label, children }) {
+export function Group({ label, children }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ fontSize: 12, color: T.textMuted, fontWeight: 600 }}>{label}</div>
@@ -98,13 +98,14 @@ function Group({ label, children }) {
   );
 }
 
-function Choice({ active, onClick, children, mono, activeColor = T.accent }) {
+export function Choice({ active, onClick, children, mono, disabled, activeColor = T.accent }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       aria-pressed={active}
       style={{
-        flex: 1, minHeight: 48, borderRadius: 8, cursor: "pointer",
+        flex: 1, minHeight: 48, borderRadius: 8, cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.35 : 1,
         fontSize: mono ? 17 : 14, fontWeight: 700, fontFamily: mono ? FONT : DFONT,
         background: active ? activeColor : T.surfaceAlt,
         color: active ? T.bg : T.text,
@@ -114,7 +115,7 @@ function Choice({ active, onClick, children, mono, activeColor = T.accent }) {
   );
 }
 
-function TypeChoices({ value, onChange }) {
+export function TypeChoices({ value, onChange }) {
   return ["shallow", "deep"].map((t) => (
     <Choice key={t} active={value === t} activeColor={TYPE_COLORS[t]} onClick={() => onChange(t)}>
       {t === "shallow" ? "Shallow" : "Deep"}

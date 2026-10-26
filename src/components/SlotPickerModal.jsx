@@ -13,6 +13,20 @@ function relevanceScore(name, sq) {
 export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign, onRemove, onClose }) {
   const { isMobile, isPortrait } = useIsMobile();
   const landscape = isMobile && !isPortrait;
+  const pinTop = isMobile && !landscape;
+
+  // On phones the picker pins to the top and fits the space above the keyboard,
+  // so the matches stay visible while typing. visualViewport shrinks when the keyboard opens.
+  const readViewport = () => ({ height: window.visualViewport?.height ?? window.innerHeight, top: window.visualViewport?.offsetTop ?? 0 });
+  const [viewport, setViewport] = useState(readViewport);
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setViewport(readViewport());
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => { vv.removeEventListener("resize", update); vv.removeEventListener("scroll", update); };
+  }, []);
 
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("smart");
@@ -183,11 +197,11 @@ export default function SlotPickerModal({ pan, slotIdx, pans, products, onAssign
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 2000, display: "flex", alignItems: pinTop ? "flex-start" : "center", justifyContent: "center", padding: pinTop ? `${viewport.top + 12}px 12px 12px` : 16 }}
       onClick={onClose}
     >
       <div
-        style={{ background: T.surface, borderRadius: 10, border: `1px solid ${T.borderLight}`, width: "100%", maxWidth: landscape ? 580 : 380, maxHeight: landscape ? "90dvh" : "82vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden" }}
+        style={{ background: T.surface, borderRadius: 10, border: `1px solid ${T.borderLight}`, width: "100%", maxWidth: landscape ? 580 : 380, maxHeight: pinTop ? viewport.height - 24 : landscape ? "90dvh" : "82vh", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,0.5)", overflow: "hidden" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
