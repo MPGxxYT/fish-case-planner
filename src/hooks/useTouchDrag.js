@@ -1,34 +1,18 @@
 import { useRef, useState } from "react";
+import { readTarget } from "../utils/dragData.js";
+import { canDrop } from "../case/drop.js";
 
 const DRAG_THRESHOLD = 8; // px before drag starts
 
-export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, onAssignProduct, onCreatePanFromProduct, onMoveProduct, onReorderPan }) {
-  const dragStateRef = useRef({
-    active: false,
-    type: null,
-    productId: null,
-    srcPanId: null,
-    srcSlotIdx: null,
-    panId: null,
-    startX: 0,
-    startY: 0,
-    moved: false,
-    ghostEl: null,
-    lastTarget: null,
-    sourceEl: null,
-    onDragActive: null,
-  });
+const idleState = () => ({ source: null, startX: 0, startY: 0, moved: false, ghostEl: null, lastTarget: null, sourceEl: null });
+
+// Touch drag: follows the finger with a ghost of the source element, then
+// reports the drop as (source, target) to onDrop, like mouse drag does.
+export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, onDrop }) {
+  const dragStateRef = useRef(idleState());
 
   // Tiny React state just to expose whether a drag is active (for cursors etc.)
   const [isDragging, setIsDragging] = useState(false);
-
-  function resetDragState() {
-    dragStateRef.current = {
-      active: false, type: null, productId: null, srcPanId: null,
-      srcSlotIdx: null, panId: null, startX: 0, startY: 0,
-      moved: false, ghostEl: null, lastTarget: null, sourceEl: null, onDragActive: null,
-    };
-  }
 
   function createGhost(touch) {
     const sourceEl = dragStateRef.current.sourceEl;
@@ -64,22 +48,14 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
     ghost.style.top = (touch.clientY - h / 2) + "px";
   }
 
-  function highlightDropTarget(clientX, clientY) {
-    // Remove previous highlight
-    if (dragStateRef.current.lastTarget) {
-      dragStateRef.current.lastTarget.style.outline = "";
-      dragStateRef.current.lastTarget = null;
+  // Use elementsFromPoint so overlays (backdrop, ghost) don't block the real target
+  function dropTargetAt(clientX, clientY) {
+    const kind = dragStateRef.current.source?.kind;
+    for (const el of document.elementsFromPoint(clientX, clientY)) {
+      const target = readTarget(el);
+      if (canDrop(kind, target)) return { el: el.closest("[data-drop-type]"), target };
     }
-    // Use elementsFromPoint so overlays (backdrop, ghost) don't block the real slot
-    const els = document.elementsFromPoint(clientX, clientY);
-    for (const el of els) {
-      const target = el.closest("[data-drop-type='slot']") || el.closest("[data-drop-type='insert']");
-      if (target) {
-        target.style.outline = "2px solid #38bdf8";
-        dragStateRef.current.lastTarget = target;
-        break;
-      }
-    }
+    return null;
   }
 
   function clearHighlight() {
@@ -89,50 +65,24 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
     }
   }
 
+  function highlightDropTarget(clientX, clientY) {
+    clearHighlight();
+    const hit = dropTargetAt(clientX, clientY);
+    if (hit) {
+      hit.el.style.outline = "2px solid #38bdf8";
+      dragStateRef.current.lastTarget = hit.el;
+    }
+  }
+
   function updatePanInsertTarget(clientX, clientY) {
     const els = document.elementsFromPoint(clientX, clientY);
     const panEl = els.map((e) => e.closest("[data-pan-id]")).find(Boolean) ?? null;
     if (!panEl) { setInsertTarget(null); return; }
     const targetPanId = panEl.dataset.panId;
-    if (targetPanId === dragStateRef.current.panId) { setInsertTarget(null); return; }
+    if (targetPanId === dragStateRef.current.source.panId) { setInsertTarget(null); return; }
     const rect = panEl.getBoundingClientRect();
     const side = clientX < rect.left + rect.width / 2 ? "left" : "right";
     setInsertTarget({ panId: targetPanId, side });
-  }
-
-  function handlePanDrop() {
-    const it = insertTargetRef.current;
-    const dragId = dragStateRef.current.panId;
-    if (!it || !dragId) return;
-    onReorderPan(dragId, it.panId, it.side);
-  }
-
-  function handleProductDrop(el) {
-    const { productId } = dragStateRef.current;
-    if (!productId) return;
-    const slotEl = el?.closest("[data-drop-type='slot']");
-    if (slotEl) {
-      onAssignProduct(slotEl.dataset.panId, +slotEl.dataset.slotIdx, productId);
-      return;
-    }
-    const insertEl = el?.closest("[data-drop-type='insert']");
-    if (insertEl) {
-      onCreatePanFromProduct(productId, +insertEl.dataset.insertIdx);
-      return;
-    }
-    const emptyEl = el?.closest("[data-drop-type='empty-case']");
-    if (emptyEl) {
-      onCreatePanFromProduct(productId, 0);
-    }
-  }
-
-  function handleSlotProductDrop(el) {
-    const { productId, srcPanId, srcSlotIdx } = dragStateRef.current;
-    if (!productId) return;
-    const slotEl = el?.closest("[data-drop-type='slot']");
-    if (slotEl) {
-      onMoveProduct({ panId: srcPanId, slot: srcSlotIdx }, { panId: slotEl.dataset.panId, slot: +slotEl.dataset.slotIdx });
-    }
   }
 
   function handleTouchMove(e) {
@@ -143,22 +93,17 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
 
     if (!ds.moved) {
       if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD) return;
-      dragStateRef.current.moved = true;
+      ds.moved = true;
       createGhost(touch);
-      // Fire callback after ghost is built so the source element is still in the DOM
-      dragStateRef.current.onDragActive?.();
       setIsDragging(true);
-      if (ds.type === "pan") setPanDragId(ds.panId);
+      if (ds.source.kind === "pan") setPanDragId(ds.source.panId);
     }
 
     e.preventDefault();
     moveGhost(touch);
 
-    if (ds.type === "pan") {
-      updatePanInsertTarget(touch.clientX, touch.clientY);
-    } else {
-      highlightDropTarget(touch.clientX, touch.clientY);
-    }
+    if (ds.source.kind === "pan") updatePanInsertTarget(touch.clientX, touch.clientY);
+    else highlightDropTarget(touch.clientX, touch.clientY);
   }
 
   function handleTouchEnd(e) {
@@ -166,46 +111,37 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
     document.removeEventListener("touchend", handleTouchEnd);
     document.removeEventListener("touchcancel", handleTouchEnd);
 
-    const ghost = dragStateRef.current.ghostEl;
-    if (ghost) { document.body.removeChild(ghost); dragStateRef.current.ghostEl = null; }
+    const { ghostEl, moved, source } = dragStateRef.current;
+    if (ghostEl) document.body.removeChild(ghostEl);
     document.body.classList.remove("touch-dragging");
     clearHighlight();
 
-    if (dragStateRef.current.moved) {
-      const touch = e.changedTouches[0];
-      // Use elementsFromPoint so the backdrop or ghost never blocks the real drop target
-      const allEls = document.elementsFromPoint(touch.clientX, touch.clientY);
-      const el = allEls.find((e) => e.closest("[data-drop-type]")) ?? null;
-      const type = dragStateRef.current.type;
-      if (type === "pan") handlePanDrop();
-      else if (type === "product") handleProductDrop(el);
-      else if (type === "slotProduct") handleSlotProductDrop(el);
+    if (moved) {
+      if (source.kind === "pan") {
+        const it = insertTargetRef.current;
+        if (it) onDrop(source, { kind: "pan", panId: it.panId, side: it.side });
+      } else {
+        const touch = e.changedTouches[0];
+        const hit = dropTargetAt(touch.clientX, touch.clientY);
+        if (hit) onDrop(source, hit.target);
+      }
     }
 
     setInsertTarget(null);
     setPanDragId(null);
     setIsDragging(false);
-    resetDragState();
+    dragStateRef.current = idleState();
   }
 
-  function startTouchDrag(e, dragInfo, sourceEl) {
-    // sourceEl can be a React ref or a DOM node
-    const el = sourceEl?.current ?? sourceEl;
+  // source is a drop source (see case/drop.js); sourceEl a React ref or DOM node to ghost
+  function startTouchDrag(e, source, sourceEl) {
     const touch = e.touches[0];
     dragStateRef.current = {
-      active: true,
-      type: dragInfo.type,
-      productId: dragInfo.productId ?? null,
-      srcPanId: dragInfo.srcPanId ?? null,
-      srcSlotIdx: dragInfo.srcSlotIdx ?? null,
-      panId: dragInfo.panId ?? null,
+      ...idleState(),
+      source,
       startX: touch.clientX,
       startY: touch.clientY,
-      moved: false,
-      ghostEl: null,
-      lastTarget: null,
-      sourceEl: el,
-      onDragActive: dragInfo.onDragActive ?? null,
+      sourceEl: sourceEl?.current ?? sourceEl,
     };
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("touchend", handleTouchEnd);

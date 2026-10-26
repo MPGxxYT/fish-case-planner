@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
 
-export function useCaseDrag(onReorderPan) {
+// Hover state for dragging a Pan by its header (which Pan is moving, and the
+// insert line beside the Pan under the pointer). The drop itself goes to onDrop.
+export function useCaseDrag(onDrop) {
   const [panDragId, setPanDragId] = useState(null);
   const [insertTarget, setInsertTargetState] = useState(null);
   const insertTargetRef = useRef(null);
@@ -9,6 +11,11 @@ export function useCaseDrag(onReorderPan) {
     const resolved = typeof val === "function" ? val(insertTargetRef.current) : val;
     insertTargetRef.current = resolved;
     setInsertTargetState(resolved);
+  };
+
+  const reset = () => {
+    setPanDragId(null);
+    setInsertTarget(null);
   };
 
   const onPanDragStart = (e, id) => setPanDragId(id);
@@ -27,20 +34,12 @@ export function useCaseDrag(onReorderPan) {
   };
 
   const onPanDrop = (e, targetId) => {
-    if (!panDragId || panDragId === targetId || !insertTargetRef.current) {
-      setInsertTarget(null);
-      setPanDragId(null);
-      return;
+    const it = insertTargetRef.current;
+    if (panDragId && panDragId !== targetId && it) {
+      e.preventDefault();
+      onDrop({ kind: "pan", panId: panDragId }, { kind: "pan", panId: targetId, side: it.side });
     }
-    e.preventDefault();
-    onReorderPan(panDragId, targetId, insertTargetRef.current.side);
-    setInsertTarget(null);
-    setPanDragId(null);
-  };
-
-  const onPanDragEnd = () => {
-    setPanDragId(null);
-    setInsertTarget(null);
+    reset();
   };
 
   return {
@@ -49,9 +48,10 @@ export function useCaseDrag(onReorderPan) {
     insertTargetRef,
     setInsertTarget,
     setPanDragId,
+    reset,
     onPanDragStart,
     onPanDragOver,
     onPanDrop,
-    onPanDragEnd,
+    onPanDragEnd: reset,
   };
 }

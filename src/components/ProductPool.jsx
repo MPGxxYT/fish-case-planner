@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { T, S, FONT, PRODUCT_COLORS, COOK_TYPES, FISH_TYPES, PRODUCT_LABELS } from "../utils/constants.js";
+import { setDragSource } from "../utils/dragData.js";
 
 const SORT_LABEL = { name: "Name", demand: "Demand", color: "Color", type: "Type", next: "Next Pick" };
 
@@ -147,7 +148,7 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
                 key={p.id}
                 data-pool-item
                 draggable
-                onDragStart={(e) => { e.dataTransfer.setData("productId", p.id); e.dataTransfer.setData("dragType", "product"); }}
+                onDragStart={(e) => setDragSource(e, { kind: "pool", productId: p.id })}
                 onClick={() => onSelectProduct?.(p.id)}
                 style={{
                   display: "flex", flexDirection: "column", gap: 3,
@@ -172,7 +173,7 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
                   }}>{p.deepShallow === "deep" ? "D" : "S"}</span>
                   <div style={{ flex: 1 }} />
                   <span
-                    onTouchStart={(e) => { e.stopPropagation(); startTouchDrag(e, { type: "product", productId: p.id }, e.currentTarget.closest("[data-pool-item]")); }}
+                    onTouchStart={(e) => { e.stopPropagation(); startTouchDrag(e, { kind: "pool", productId: p.id }, e.currentTarget.closest("[data-pool-item]")); }}
                     style={{ fontSize: 13, color: T.textDim, cursor: "grab", padding: "2px 3px", touchAction: "none", lineHeight: 1 }}
                     title="Drag to insert new pan"
                   >⠿</span>
@@ -189,7 +190,7 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
           // Desktop card
           return (
             <div key={p.id} data-pool-item draggable
-              onDragStart={(e) => { e.dataTransfer.setData("productId", p.id); e.dataTransfer.setData("dragType", "product"); }}
+              onDragStart={(e) => setDragSource(e, { kind: "pool", productId: p.id })}
               style={{
                 display: "flex", flexDirection: "column",
                 padding: "7px 8px 7px", borderRadius: 6,
