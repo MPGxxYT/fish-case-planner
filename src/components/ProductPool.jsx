@@ -50,18 +50,18 @@ export default function ProductPool({ products, filters, setFilters, startTouchD
     <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minHeight: 0 }}>
       {/* Search + Filter/Sort — inline row */}
       <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-        <input style={{ ...S.inp, flex: "1 1 auto", minWidth: 0, maxWidth: "50%" }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name / PLU..." />
+        <input style={{ ...S.inp, flex: "1 1 auto", minWidth: 0, maxWidth: "50%", ...(isMobile && { minHeight: 44, fontSize: 16 }) }} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search name / PLU..." />
         <button
           type="button"
           onClick={() => { setShowFiltersPanel((v) => !v); setShowSortPanel(false); }}
-          style={{ ...S.sel, cursor: "pointer", flexShrink: 0, padding: "6px 10px", background: activeFilterCount > 0 ? T.accentDim + "55" : T.surfaceAlt, color: activeFilterCount > 0 ? T.accent : T.text, border: `1px solid ${activeFilterCount > 0 ? T.accent + "66" : T.borderLight}`, textAlign: "center" }}
+          style={{ ...S.sel, cursor: "pointer", flexShrink: 0, padding: "6px 10px", ...(isMobile && { minHeight: 44, fontSize: 12 }), background: activeFilterCount > 0 ? T.accentDim + "55" : T.surfaceAlt, color: activeFilterCount > 0 ? T.accent : T.text, border: `1px solid ${activeFilterCount > 0 ? T.accent + "66" : T.borderLight}`, textAlign: "center" }}
         >
           {isMobile ? (activeFilterCount > 0 ? `Filter(${activeFilterCount})` : "Filter") : (activeFilterCount > 0 ? `Filters (${activeFilterCount})` : "Filters")} {showFiltersPanel ? "▲" : "▼"}
         </button>
         <button
           type="button"
           onClick={() => { setShowSortPanel((v) => !v); setShowFiltersPanel(false); }}
-          style={{ ...S.sel, cursor: "pointer", flexShrink: 0, padding: "6px 10px", color: T.text, border: `1px solid ${T.borderLight}`, textAlign: "center" }}
+          style={{ ...S.sel, cursor: "pointer", flexShrink: 0, padding: "6px 10px", ...(isMobile && { minHeight: 44, fontSize: 12 }), color: T.text, border: `1px solid ${T.borderLight}`, textAlign: "center" }}
         >
           {isMobile ? `Sort ${showSortPanel ? "▲" : "▼"}` : `Sort: ${SORT_LABEL[filters.sort || "name"]} ${showSortPanel ? "▲" : "▼"}`}
         </button>

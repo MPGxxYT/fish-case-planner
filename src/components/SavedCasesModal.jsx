@@ -2,6 +2,39 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { T, S, FONT, DFONT } from "../utils/constants.js";
 import { fetchPublicCases, fetchCaseByCode, publishCase, deletePublicCase, updatePublicCase } from "../lib/api.js";
 import CasePreview from "./CasePreview.jsx";
+import { useIsMobile } from "../hooks/useIsMobile.js";
+
+// A row's secondary actions, shown as labeled buttons under it after tapping More.
+function ActionStrip({ actions }) {
+  const { isMobile } = useIsMobile();
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, padding: "8px 10px", background: T.bg, border: `1px solid ${T.border}`, borderTop: "none" }}>
+      {actions.map(({ label, onClick, danger }) => (
+        <button
+          key={label}
+          onClick={onClick}
+          style={{ ...S.ch, fontSize: 12, ...(isMobile && { minHeight: 44 }), ...(danger && { background: T.danger + "22", color: T.danger, border: `1px solid ${T.danger}55` }) }}
+        >{label}</button>
+      ))}
+    </div>
+  );
+}
+
+function LoadButton({ onClick }) {
+  const { isMobile } = useIsMobile();
+  return <button style={{ ...S.ch, ...(isMobile && { minHeight: 44, minWidth: 44 }), background: T.accent, color: T.bg }} onClick={onClick}>Load</button>;
+}
+
+function MoreButton({ open, onClick }) {
+  const { isMobile } = useIsMobile();
+  return (
+    <button
+      style={{ ...S.ch, ...(isMobile && { minHeight: 44, minWidth: 44 }), background: open ? T.borderLight : S.ch.background }}
+      aria-expanded={open}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+    >More</button>
+  );
+}
 
 const TAB_STYLE = (active) => ({
   background: active ? T.accent : "transparent",
@@ -29,6 +62,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
   const [deleteIdx, setDeleteIdx] = useState(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [updateIdx, setUpdateIdx] = useState(null);
+  const [menuIdx, setMenuIdx] = useState(null);
 
   const filtered = search.trim()
     ? savedCases.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -77,7 +111,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
               <div
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
-                  padding: "8px 10px", borderRadius: (previewIdx === i || deleteIdx === i || updateIdx === i || publishIdx === i || publishResult?.idx === i) ? "6px 6px 0 0" : 6,
+                  padding: "8px 10px", borderRadius: (previewIdx === i || menuIdx === i || deleteIdx === i || updateIdx === i || publishIdx === i || publishResult?.idx === i) ? "6px 6px 0 0" : 6,
                   background: T.surfaceAlt,
                   border: `1px solid ${previewIdx === i ? T.borderLight : T.border}`,
                   cursor: "pointer",
@@ -89,12 +123,17 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
                   <div style={{ fontSize: 13, color: T.text, fontWeight: 600 }}>{c.name}</div>
                   <div style={{ fontSize: 10, color: T.textDim }}>{c.pans.length} pans · {c.caseWidth}w · {new Date(c.savedAt).toLocaleDateString()}</div>
                 </div>
-                <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={(e) => { e.stopPropagation(); onLoad(c); }}>Load</button>
-                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setPublishIdx(publishIdx === i ? null : i); setPublishResult(null); }} title="Publish publicly" aria-label="Publish publicly">☁↑</button>
-                <button style={S.ch} onClick={(e) => { e.stopPropagation(); onExport(c); }} title="Export to file" aria-label="Export to file">↓</button>
-                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateIdx(updateIdx === i ? null : i); setDeleteIdx(null); setDeleteConfirmText(""); }} title="Overwrite with current case" aria-label="Overwrite with current case">↺</button>
-                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteIdx(deleteIdx === i ? null : i); setUpdateIdx(null); setDeleteConfirmText(""); }} title="Delete" aria-label="Delete">×</button>
+                <LoadButton onClick={(e) => { e.stopPropagation(); onLoad(c); }} />
+                <MoreButton open={menuIdx === i} onClick={() => setMenuIdx(menuIdx === i ? null : i)} />
               </div>
+              {menuIdx === i && (
+                <ActionStrip actions={[
+                  { label: "Publish", onClick: () => { setMenuIdx(null); setPublishIdx(i); setPublishResult(null); } },
+                  { label: "Export file", onClick: () => { setMenuIdx(null); onExport(c); } },
+                  { label: "Overwrite with current case", onClick: () => { setMenuIdx(null); setUpdateIdx(i); setDeleteIdx(null); setDeleteConfirmText(""); } },
+                  { label: "Delete", danger: true, onClick: () => { setMenuIdx(null); setDeleteIdx(i); setUpdateIdx(null); setDeleteConfirmText(""); } },
+                ]} />
+              )}
 
               {/* Update confirmation */}
               {updateIdx === i && (
@@ -218,6 +257,8 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentLayo
 
   // Save to local feedback
   const [savedLocalCode, setSavedLocalCode] = useState(null);
+  const [menuCode, setMenuCode] = useState(null);
+  const { isMobile } = useIsMobile();
   const handleSaveLocal = (c) => {
     onSavePublicToLocal(c);
     setSavedLocalCode(c.shortCode);
@@ -359,7 +400,7 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentLayo
               <div
                 style={{
                   display: "flex", alignItems: "center", gap: 8,
-                  padding: "8px 10px", borderRadius: (previewIdx === i || deleteCode === c.shortCode || updateCode === c.shortCode) ? "6px 6px 0 0" : 6,
+                  padding: "8px 10px", borderRadius: (previewIdx === i || menuCode === c.shortCode || deleteCode === c.shortCode || updateCode === c.shortCode) ? "6px 6px 0 0" : 6,
                   background: T.surfaceAlt,
                   border: `1px solid ${previewIdx === i ? T.borderLight : T.border}`,
                   cursor: "pointer",
@@ -376,12 +417,17 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentLayo
                     {" · "}<code style={{ fontFamily: FONT, color: T.accent, fontSize: 9 }}>{c.shortCode}</code>
                   </div>
                 </div>
-                <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={(e) => { e.stopPropagation(); onLoadPublic(c); }}>Load</button>
-                <button style={{ ...S.ch, color: copiedCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleCopyId(c.shortCode); }}>{copiedCode === c.shortCode ? "Copied!" : "Copy ID"}</button>
-                <button style={{ ...S.ch, color: savedLocalCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleSaveLocal(c); }} title="Save to local" aria-label="Save to local">{savedLocalCode === c.shortCode ? "Saved!" : "💾"}</button>
-                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateCode(updateCode === c.shortCode ? null : c.shortCode); setUpdateError(null); setDeleteCode(null); setDeleteConfirmText(""); }} title="Overwrite with current case" aria-label="Overwrite with current case">↺</button>
-                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteCode(deleteCode === c.shortCode ? null : c.shortCode); setUpdateCode(null); setUpdateError(null); setDeleteConfirmText(""); }} title="Delete" aria-label="Delete">×</button>
+                <LoadButton onClick={(e) => { e.stopPropagation(); onLoadPublic(c); }} />
+                <button style={{ ...S.ch, ...(isMobile && { minHeight: 44 }), color: copiedCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleCopyId(c.shortCode); }}>{copiedCode === c.shortCode ? "Copied!" : "Copy ID"}</button>
+                <MoreButton open={menuCode === c.shortCode} onClick={() => setMenuCode(menuCode === c.shortCode ? null : c.shortCode)} />
               </div>
+              {menuCode === c.shortCode && (
+                <ActionStrip actions={[
+                  { label: savedLocalCode === c.shortCode ? "Saved to local" : "Save to local", onClick: () => handleSaveLocal(c) },
+                  { label: "Overwrite with current case", onClick: () => { setMenuCode(null); setUpdateCode(c.shortCode); setUpdateError(null); setDeleteCode(null); setDeleteConfirmText(""); } },
+                  { label: "Delete", danger: true, onClick: () => { setMenuCode(null); setDeleteCode(c.shortCode); setUpdateCode(null); setUpdateError(null); setDeleteConfirmText(""); } },
+                ]} />
+              )}
               {/* Update confirmation */}
               {updateCode === c.shortCode && (
                 <div style={{ padding: "8px 12px", background: T.bg, border: `1px solid ${T.accent}44`, borderTop: "none", borderRadius: (previewIdx === i || deleteCode === c.shortCode) ? 0 : "0 0 6px 6px", display: "flex", alignItems: "center", gap: 8 }}>
@@ -446,7 +492,7 @@ export default function SavedCasesModal({ savedCases, products, onLoad, onDelete
 
   return (
     <div style={S.ov} onClick={onClose}>
-      <div style={{ ...S.mod, maxWidth: "95vw", width: 800, maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+      <div className="touch-sized" style={{ ...S.mod, maxWidth: "95vw", width: 800, maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontFamily: DFONT, color: T.text }}>Case Browser</h3>
           <div style={{ display: "flex", gap: 4 }}>
