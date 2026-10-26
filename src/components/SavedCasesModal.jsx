@@ -90,10 +90,10 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
                   <div style={{ fontSize: 10, color: T.textDim }}>{c.pans.length} pans · {c.caseWidth}w · {new Date(c.savedAt).toLocaleDateString()}</div>
                 </div>
                 <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={(e) => { e.stopPropagation(); onLoad(c); }}>Load</button>
-                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setPublishIdx(publishIdx === i ? null : i); setPublishResult(null); }} title="Publish publicly">☁↑</button>
-                <button style={S.ch} onClick={(e) => { e.stopPropagation(); onExport(c); }} title="Export to file">↓</button>
-                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateIdx(updateIdx === i ? null : i); setDeleteIdx(null); setDeleteConfirmText(""); }} title="Overwrite with current case">↺</button>
-                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteIdx(deleteIdx === i ? null : i); setUpdateIdx(null); setDeleteConfirmText(""); }}>×</button>
+                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setPublishIdx(publishIdx === i ? null : i); setPublishResult(null); }} title="Publish publicly" aria-label="Publish publicly">☁↑</button>
+                <button style={S.ch} onClick={(e) => { e.stopPropagation(); onExport(c); }} title="Export to file" aria-label="Export to file">↓</button>
+                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateIdx(updateIdx === i ? null : i); setDeleteIdx(null); setDeleteConfirmText(""); }} title="Overwrite with current case" aria-label="Overwrite with current case">↺</button>
+                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteIdx(deleteIdx === i ? null : i); setUpdateIdx(null); setDeleteConfirmText(""); }} title="Delete" aria-label="Delete">×</button>
               </div>
 
               {/* Update confirmation */}
@@ -122,7 +122,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
                     onClick={() => { onDelete(savedCases.indexOf(c)); setDeleteIdx(null); setDeleteConfirmText(""); setPreviewIdx(null); }}
                     disabled={deleteConfirmText.toLowerCase() !== "yes"}
                   >Delete</button>
-                  <button style={S.ch} onClick={() => { setDeleteIdx(null); setDeleteConfirmText(""); }}>×</button>
+                  <button style={S.ch} onClick={() => { setDeleteIdx(null); setDeleteConfirmText(""); }} aria-label="Cancel">×</button>
                 </div>
               )}
 
@@ -140,7 +140,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
                   <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={() => handlePublish(c, i)} disabled={publishing}>
                     {publishing ? "..." : "Publish"}
                   </button>
-                  <button style={S.ch} onClick={() => setPublishIdx(null)}>×</button>
+                  <button style={S.ch} onClick={() => setPublishIdx(null)} aria-label="Cancel">×</button>
                 </div>
               )}
 
@@ -341,7 +341,7 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentLayo
               </div>
             </div>
             <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={() => onLoadPublic(codeResult)}>Load</button>
-            <button style={S.ch} onClick={() => setCodeResult(null)}>×</button>
+            <button style={S.ch} onClick={() => setCodeResult(null)} aria-label="Close">×</button>
           </div>
           <CasePreview pans={codeResult.pans} products={codeResult.products} caseWidth={codeResult.caseWidth} height={160} />
         </div>
@@ -378,9 +378,9 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentLayo
                 </div>
                 <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={(e) => { e.stopPropagation(); onLoadPublic(c); }}>Load</button>
                 <button style={{ ...S.ch, color: copiedCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleCopyId(c.shortCode); }}>{copiedCode === c.shortCode ? "Copied!" : "Copy ID"}</button>
-                <button style={{ ...S.ch, color: savedLocalCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleSaveLocal(c); }} title="Save to local">{savedLocalCode === c.shortCode ? "Saved!" : "💾"}</button>
-                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateCode(updateCode === c.shortCode ? null : c.shortCode); setUpdateError(null); setDeleteCode(null); setDeleteConfirmText(""); }} title="Overwrite with current case">↺</button>
-                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteCode(deleteCode === c.shortCode ? null : c.shortCode); setUpdateCode(null); setUpdateError(null); setDeleteConfirmText(""); }}>×</button>
+                <button style={{ ...S.ch, color: savedLocalCode === c.shortCode ? T.success : S.ch.color }} onClick={(e) => { e.stopPropagation(); handleSaveLocal(c); }} title="Save to local" aria-label="Save to local">{savedLocalCode === c.shortCode ? "Saved!" : "💾"}</button>
+                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateCode(updateCode === c.shortCode ? null : c.shortCode); setUpdateError(null); setDeleteCode(null); setDeleteConfirmText(""); }} title="Overwrite with current case" aria-label="Overwrite with current case">↺</button>
+                <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteCode(deleteCode === c.shortCode ? null : c.shortCode); setUpdateCode(null); setUpdateError(null); setDeleteConfirmText(""); }} title="Delete" aria-label="Delete">×</button>
               </div>
               {/* Update confirmation */}
               {updateCode === c.shortCode && (
@@ -411,7 +411,7 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentLayo
                   >
                     {deleting ? "..." : "Delete"}
                   </button>
-                  <button style={S.ch} onClick={() => { setDeleteCode(null); setDeleteConfirmText(""); }}>×</button>
+                  <button style={S.ch} onClick={() => { setDeleteCode(null); setDeleteConfirmText(""); }} aria-label="Cancel">×</button>
                 </div>
               )}
               {previewIdx === i && (

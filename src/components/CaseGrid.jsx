@@ -42,7 +42,7 @@ function InsertZone({ idx, afterPanId, hoverInsertIdx, setHoverInsertIdx, hoverD
         setHoverDividerIdx(null);
       }}
       onClick={() => { if (canToggleDivider) onDrop({ kind: "divider" }, target); }}
-      title={!dividerEditMode ? "Enable divider editing (tab below case) to add or remove dividers" : hasDivider ? "Click to remove divider" : "Drag a divider here, or click to toggle"}
+      title={!dividerEditMode ? "Tap Dividers below the case to add or remove dividers" : hasDivider ? "Tap to remove this divider" : "Tap to add a divider here"}
       style={{
         width: hasDivider ? 8 : 6,
         minWidth: hasDivider ? 8 : 6,
@@ -171,8 +171,8 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onRemovePa
                 }}
               >
                 <span style={{ fontSize: 28, opacity: 0.25 }}>🐟</span>
-                <span style={{ fontSize: 12, color: T.textDim }}>Add pans or use Auto Generate</span>
-                <span style={{ fontSize: 10, color: T.textDim }}>Drag products from the pool into slots or between pans</span>
+                <span style={{ fontSize: 12, color: T.textDim }}>Add a pan above, or tap Auto to build a case from your products</span>
+                <span style={{ fontSize: 10, color: T.textDim }}>Or drag a product here from Products</span>
               </div>
             ) : (
               <>
@@ -233,7 +233,7 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onRemovePa
               <button
                 type="button"
                 onClick={onToggleDividerEditMode}
-                title={dividerEditMode ? "Divider editing is on — tap gaps between pans to add/remove dividers. Tap to turn off." : "Turn on divider editing to add or remove dividers between pans"}
+                aria-pressed={dividerEditMode}
                 style={{
                   position: "absolute", left: 0, top: "50%", transform: "translateY(-50%)",
                   display: "flex", alignItems: "center", gap: 4,
@@ -243,9 +243,14 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onRemovePa
                   background: dividerEditMode ? T.accent : T.surfaceAlt,
                   color: dividerEditMode ? T.bg : T.textDim,
                 }}
-              >╫ {dividerEditMode ? "Editing" : "Dividers"}</button>
+              >╫ {dividerEditMode ? "Done" : "Dividers"}</button>
             )}
           </div>
+          {dividerEditMode && (
+            <div role="status" style={{ marginTop: 6, fontSize: 11, color: T.accent, textAlign: "center" }}>
+              Tap a gap between pans to add or remove a divider
+            </div>
+          )}
         </div>
 
         {/* Right label */}

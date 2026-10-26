@@ -78,7 +78,8 @@ export default function PanColumn({ pan, products, onDrop, unitSize, onRemovePan
               setShowMenu((s) => !s);
             }}
             style={{ fontSize: 16, fontWeight: 800, color: T.accent, fontFamily: FONT, cursor: "pointer", padding: "0 4px" }}
-            title="Click to change pan width/split"
+            title="Change width or split"
+            aria-label={`Pan width ${pan.width}. Change width or split`}
           >{pan.width}</span>
           {pan.depth !== "full" && <span style={{ fontSize: 9, color: T.textDim, fontFamily: FONT }}>{pan.depth === "half" ? "½" : "⅓"}</span>}
           {/* Only show header deep/shallow badge for full pans */}
@@ -103,6 +104,7 @@ export default function PanColumn({ pan, products, onDrop, unitSize, onRemovePan
               color: T.textDim, cursor: "pointer", fontSize: 12, padding: "0 2px", lineHeight: 1, opacity: 0.4,
             }}
             title="Remove pan"
+            aria-label="Remove pan"
           >
             ×
           </button>

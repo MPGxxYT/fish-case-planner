@@ -86,7 +86,7 @@ export default function AddPanControls({ onAddPan, remainingWidth, dividerEditMo
         <div
           draggable={dividerEditMode}
           onDragStart={(e) => { if (!dividerEditMode) { e.preventDefault(); return; } setDragSource(e, { kind: "divider" }); }}
-          title={dividerEditMode ? "Drag into the case to place a divider" : "Turn on divider editing (tab below the case) to place dividers"}
+          title={dividerEditMode ? "Drag into a gap between pans to place a divider" : "Tap Dividers below the case first"}
           style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 5, border: `1px solid ${T.border}`, background: T.surface, cursor: dividerEditMode ? "grab" : "not-allowed", userSelect: "none", opacity: dividerEditMode ? 1 : 0.4 }}
         >
           <div style={{ width: 3, height: 18, background: DIVIDER_COLOR, borderRadius: 1, flexShrink: 0 }} />
