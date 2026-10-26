@@ -1,8 +1,10 @@
 import { useState, useRef } from "react";
 import { T, FONT, DFONT, PRODUCT_COLORS, DEPTH_UNITS, CASE_DEPTH, PRODUCT_LABELS } from "../utils/constants.js";
 import { getSlotLabel } from "../utils/helpers.js";
+import { setDragSource, getDragSource, dragKind } from "../utils/dragData.js";
+import { canDrop } from "../case/drop.js";
 
-export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onClearSlot, onMoveProduct, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
+export default function PanSlot({ pan, slotIdx, products, onDrop, onClearSlot, onSetSlotType, totalDepthSlots, startTouchDrag, selectedProductId, onPickProduct }) {
   const [dOver, setDOver] = useState(false);
   const slotRef = useRef();
   const product = pan.slots[slotIdx] ? products.find((p) => p.id === pan.slots[slotIdx]) : null;
@@ -12,10 +14,12 @@ export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onCle
   const isSplit = pan.depth !== "full";
   const slotType = pan.slotTypes?.[slotIdx] ?? pan.panType;
   const isPlaceMode = !!selectedProductId;
+  const target = { kind: "slot", panId: pan.id, slot: slotIdx };
+  const source = product ? { kind: "slot", panId: pan.id, slot: slotIdx, productId: product.id } : null;
 
   const handleSlotClick = () => {
     if (isPlaceMode) {
-      onMobilePlaceProduct?.(pan.id, slotIdx);
+      onDrop({ kind: "pool", productId: selectedProductId }, target);
       return;
     }
     if (product) {
@@ -33,29 +37,19 @@ export default function PanSlot({ pan, slotIdx, products, onAssignProduct, onCle
       data-slot-idx={slotIdx}
       draggable={!!product}
       onClick={handleSlotClick}
-      onDragStart={product ? (e) => {
-        e.stopPropagation();
-        e.dataTransfer.setData("productId", product.id);
-        e.dataTransfer.setData("dragType", "slotProduct");
-        e.dataTransfer.setData("srcPanId", pan.id);
-        e.dataTransfer.setData("srcSlotIdx", String(slotIdx));
-      } : undefined}
-      onTouchStart={product ? (e) => {
-        startTouchDrag(e, { type: "slotProduct", productId: product.id, srcPanId: pan.id, srcSlotIdx: slotIdx }, slotRef);
-      } : undefined}
-      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setDOver(true); }}
+      onDragStart={source ? (e) => { e.stopPropagation(); setDragSource(e, source); } : undefined}
+      onTouchStart={source ? (e) => startTouchDrag(e, source, slotRef) : undefined}
+      onDragOver={(e) => {
+        if (!canDrop(dragKind(e), target)) return;
+        e.preventDefault(); e.stopPropagation(); setDOver(true);
+      }}
       onDragLeave={() => setDOver(false)}
       onDrop={(e) => {
-        e.preventDefault(); e.stopPropagation(); setDOver(false);
-        const dt = e.dataTransfer.getData("dragType");
-        const pid = e.dataTransfer.getData("productId");
-        if (dt === "product" && pid) {
-          onAssignProduct(pan.id, slotIdx, pid);
-        } else if (dt === "slotProduct" && pid) {
-          const sPan = e.dataTransfer.getData("srcPanId");
-          const sIdx = +e.dataTransfer.getData("srcSlotIdx");
-          onMoveProduct({ panId: sPan, slot: sIdx }, { panId: pan.id, slot: slotIdx });
-        }
+        setDOver(false);
+        const src = getDragSource(e);
+        if (!src || !canDrop(src.kind, target)) return;
+        e.preventDefault(); e.stopPropagation();
+        onDrop(src, target);
       }}
       style={{
         width: "100%", height: `${slotH}%`,

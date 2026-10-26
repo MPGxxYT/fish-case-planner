@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { T, S, FONT, PAN_WIDTHS, PAN_DEPTHS_SPLIT } from "../utils/constants.js";
 import { canSplitDepth } from "../case/layout.js";
+import { setDragSource } from "../utils/dragData.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { DIVIDER_COLOR } from "./CaseGrid.jsx";
 
@@ -84,7 +85,7 @@ export default function AddPanControls({ onAddPan, remainingWidth, dividerEditMo
         )}
         <div
           draggable={dividerEditMode}
-          onDragStart={(e) => { if (!dividerEditMode) { e.preventDefault(); return; } e.dataTransfer.setData("dragType", "divider"); e.dataTransfer.setData("divider", "1"); }}
+          onDragStart={(e) => { if (!dividerEditMode) { e.preventDefault(); return; } setDragSource(e, { kind: "divider" }); }}
           title={dividerEditMode ? "Drag into the case to place a divider" : "Turn on divider editing (tab below the case) to place dividers"}
           style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 5, border: `1px solid ${T.border}`, background: T.surface, cursor: dividerEditMode ? "grab" : "not-allowed", userSelect: "none", opacity: dividerEditMode ? 1 : 0.4 }}
         >

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { T, FONT, PAN_WIDTHS } from "../utils/constants.js";
 import { getDepthSlots } from "../utils/helpers.js";
 import { canSplitDepth } from "../case/layout.js";
+import { setDragSource } from "../utils/dragData.js";
 import PanSlot from "./PanSlot.jsx";
 
 const DEPTH_OPTIONS = [
@@ -10,7 +11,7 @@ const DEPTH_OPTIONS = [
   { key: "third", label: "Third" },
 ];
 
-export default function PanColumn({ pan, products, onAssignProduct, onClearSlot, onMoveProduct, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, startTouchDrag, isMobile, selectedProductId, onMobilePlaceProduct, onPickProduct }) {
+export default function PanColumn({ pan, products, onDrop, onClearSlot, unitSize, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, remainingWidth, insertIndicator, drag, startTouchDrag, isMobile, selectedProductId, onPickProduct }) {
   const ds = getDepthSlots(pan.depth);
   const isSplit = pan.depth !== "full";
   const maxAllowed = (remainingWidth || 0) + pan.width;
@@ -44,8 +45,8 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
       {insertIndicator === "left" && <div style={{ position: "absolute", left: -2, top: 0, bottom: 0, width: 4, background: T.accent, borderRadius: 2, zIndex: 10 }} />}
       <div
         data-pan-id={pan.id}
-        onDragOver={(e) => onPanDragOver(e, pan.id)}
-        onDrop={(e) => onPanDrop(e, pan.id)}
+        onDragOver={(e) => drag.onPanDragOver(e, pan.id)}
+        onDrop={(e) => drag.onPanDrop(e, pan.id)}
         style={{
           width: pan.width * unitSize, minWidth: pan.width * unitSize, height: "100%",
           borderRight: `1px solid ${T.border}`, display: "flex", flexDirection: "column",
@@ -56,9 +57,9 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
         <div
           ref={headerRef}
           draggable
-          onDragStart={(e) => { e.dataTransfer.setData("dragType", "pan"); e.dataTransfer.setData("panId", pan.id); onPanDragStart(e, pan.id); }}
-          onDragEnd={onPanDragEnd}
-          onTouchStart={(e) => startTouchDrag(e, { type: "pan", panId: pan.id }, headerRef)}
+          onDragStart={(e) => { setDragSource(e, { kind: "pan", panId: pan.id }); drag.onPanDragStart(e, pan.id); }}
+          onDragEnd={drag.onPanDragEnd}
+          onTouchStart={(e) => startTouchDrag(e, { kind: "pan", panId: pan.id }, headerRef)}
           style={{
             height: isMobile ? 44 : 34, background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexShrink: 0, position: "relative",
@@ -167,11 +168,11 @@ export default function PanColumn({ pan, products, onAssignProduct, onClearSlot,
           {ds.map((idx) => (
             <PanSlot
               key={idx} pan={pan} slotIdx={idx} products={products}
-              onAssignProduct={onAssignProduct} onClearSlot={onClearSlot} onMoveProduct={onMoveProduct}
+              onDrop={onDrop} onClearSlot={onClearSlot}
               onSetSlotType={onSetSlotType}
               totalDepthSlots={ds.length}
               startTouchDrag={startTouchDrag}
-              selectedProductId={selectedProductId} onMobilePlaceProduct={onMobilePlaceProduct}
+              selectedProductId={selectedProductId}
               onPickProduct={onPickProduct}
             />
           ))}

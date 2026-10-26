@@ -1,61 +1,47 @@
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { T, FONT } from "../utils/constants.js";
 import { usedWidth as sumWidth } from "../case/layout.js";
+import { dragKind, getDragSource } from "../utils/dragData.js";
+import { canDrop } from "../case/drop.js";
 import PanColumn from "./PanColumn.jsx";
 
 export const DIVIDER_COLOR = "#94a3b8";
 
-function InsertZone({ idx, hoverInsertIdx, setHoverInsertIdx, hoverDividerIdx, setHoverDividerIdx, panDragId, onCreatePanFromProduct, hasDivider, onToggleDivider, dividerEditMode }) {
+function InsertZone({ idx, afterPanId, hoverInsertIdx, setHoverInsertIdx, hoverDividerIdx, setHoverDividerIdx, panDragId, onDrop, hasDivider, dividerEditMode }) {
   const isProductHover = hoverInsertIdx === idx;
   const isDividerHover = hoverDividerIdx === idx;
   const isPanDragging = !!panDragId;
   const canToggleDivider = dividerEditMode && !isPanDragging;
+  const target = { kind: "gap", index: idx, afterPanId };
 
   return (
     <div
       data-drop-type="insert"
       data-insert-idx={idx}
+      data-after-pan-id={afterPanId}
       onDragOver={(e) => {
-        const dt = e.dataTransfer.types;
-        if (isPanDragging) return;
-        if (dt.includes("divider")) {
-          if (!dividerEditMode) return;
-          e.preventDefault();
-          e.stopPropagation();
-          setHoverDividerIdx(idx);
-          return;
-        }
-        const isSlotDrag = dt.includes("srcpanid");
-        if (!isSlotDrag) {
-          e.preventDefault();
-          e.stopPropagation();
-          setHoverInsertIdx(idx);
-        }
+        const kind = dragKind(e);
+        if (!canDrop(kind, target, { dividerEditMode })) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (kind === "divider") setHoverDividerIdx(idx);
+        else setHoverInsertIdx(idx);
       }}
       onDragLeave={() => {
         setHoverInsertIdx((prev) => prev === idx ? null : prev);
         setHoverDividerIdx((prev) => prev === idx ? null : prev);
       }}
       onDrop={(e) => {
-        const dragType = e.dataTransfer.getData("dragType");
-        if (dragType === "divider") {
-          if (dividerEditMode) {
-            e.preventDefault();
-            e.stopPropagation();
-            onToggleDivider();
-          }
-        } else {
-          const pid = e.dataTransfer.getData("productId");
-          if (dragType === "product" && pid) {
-            e.preventDefault();
-            e.stopPropagation();
-            onCreatePanFromProduct(pid, idx);
-          }
+        const source = getDragSource(e);
+        if (source && canDrop(source.kind, target, { dividerEditMode })) {
+          e.preventDefault();
+          e.stopPropagation();
+          onDrop(source, target);
         }
         setHoverInsertIdx(null);
         setHoverDividerIdx(null);
       }}
-      onClick={() => { if (canToggleDivider) onToggleDivider(); }}
+      onClick={() => { if (canToggleDivider) onDrop({ kind: "divider" }, target); }}
       title={!dividerEditMode ? "Enable divider editing (tab below case) to add or remove dividers" : hasDivider ? "Click to remove divider" : "Drag a divider here, or click to toggle"}
       style={{
         width: hasDivider ? 8 : 6,
@@ -113,7 +99,8 @@ function getPanSummary(pans) {
   return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onMoveProduct, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, isPortrait, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct, dividers = new Set(), onToggleDivider, dividerEditMode = false, onToggleDividerEditMode }) {
+export default function CaseGrid({ pans, products, caseWidth, onDrop, onClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, drag, isMobile, isPortrait, startTouchDrag, selectedProductId, onPickProduct, dividers = new Set(), dividerEditMode = false, onToggleDividerEditMode }) {
+  const { insertTarget, panDragId } = drag;
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
   const [hoverInsertIdx, setHoverInsertIdx] = useState(null);
@@ -162,26 +149,23 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
               overflowX: "auto", overflowY: "hidden", position: "relative",
             }}
             onDragOver={(e) => e.preventDefault()}
-            onDrop={() => { setHoverInsertIdx(null); setInsertTarget(null); setPanDragId(null); }}
+            onDrop={() => { setHoverInsertIdx(null); drag.reset(); }}
           >
             {pans.length === 0 ? (
               <div
                 data-drop-type="empty-case"
                 style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6 }}
                 onDragOver={(e) => {
-                  const dt = e.dataTransfer.types;
-                  if (!dt.includes("srcpanid")) {
-                    e.preventDefault();
-                    setHoverInsertIdx(0);
-                  }
+                  if (!canDrop(dragKind(e), { kind: "empty" })) return;
+                  e.preventDefault();
+                  setHoverInsertIdx(0);
                 }}
                 onDrop={(e) => {
-                  const pid = e.dataTransfer.getData("productId");
-                  const dragType = e.dataTransfer.getData("dragType");
-                  if (dragType === "product" && pid) {
+                  const source = getDragSource(e);
+                  if (source && canDrop(source.kind, { kind: "empty" })) {
                     e.preventDefault();
                     e.stopPropagation();
-                    onCreatePanFromProduct(pid, 0);
+                    onDrop(source, { kind: "empty" });
                   }
                   setHoverInsertIdx(null);
                 }}
@@ -193,24 +177,23 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
             ) : (
               <>
                 {/* Insert zone before first pan */}
-                <InsertZone idx={0} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} hoverDividerIdx={hoverDividerIdx} setHoverDividerIdx={setHoverDividerIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} hasDivider={dividers.has("start")} onToggleDivider={() => onToggleDivider("start")} dividerEditMode={dividerEditMode} />
+                <InsertZone idx={0} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} hoverDividerIdx={hoverDividerIdx} setHoverDividerIdx={setHoverDividerIdx} panDragId={panDragId} onDrop={onDrop} afterPanId="start" hasDivider={dividers.has("start")} dividerEditMode={dividerEditMode} />
                 {pans.map((pan, i) => (
                   <span key={pan.id} style={{ display: "contents" }}>
                     <PanColumn
                       pan={pan} products={products}
-                      onAssignProduct={onAssignProduct} onClearSlot={onClearSlot} onMoveProduct={onMoveProduct}
+                      onDrop={onDrop} onClearSlot={onClearSlot}
                       unitSize={unitSize} onRemovePan={onRemovePan} onSetPanType={onSetPanType}
                       onSetSlotType={onSetSlotType} onSetPanWidth={onSetPanWidth} onSetPanDepth={onSetPanDepth}
                       remainingWidth={remainingWidth}
                       insertIndicator={insertTarget?.panId === pan.id ? insertTarget.side : null}
-                      onPanDragStart={onPanDragStart} onPanDragOver={onPanDragOver}
-                      onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
+                      drag={drag}
                       startTouchDrag={startTouchDrag} isMobile={isMobile}
-                      selectedProductId={selectedProductId} onMobilePlaceProduct={onMobilePlaceProduct}
+                      selectedProductId={selectedProductId}
                       onPickProduct={onPickProduct}
                     />
                     {/* Insert zone after each pan */}
-                    <InsertZone idx={i + 1} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} hoverDividerIdx={hoverDividerIdx} setHoverDividerIdx={setHoverDividerIdx} panDragId={panDragId} onCreatePanFromProduct={onCreatePanFromProduct} hasDivider={dividers.has(pan.id)} onToggleDivider={() => onToggleDivider(pan.id)} dividerEditMode={dividerEditMode} />
+                    <InsertZone idx={i + 1} hoverInsertIdx={hoverInsertIdx} setHoverInsertIdx={setHoverInsertIdx} hoverDividerIdx={hoverDividerIdx} setHoverDividerIdx={setHoverDividerIdx} panDragId={panDragId} onDrop={onDrop} afterPanId={pan.id} hasDivider={dividers.has(pan.id)} dividerEditMode={dividerEditMode} />
                   </span>
                 ))}
                 {remainingWidth > 0 && (
@@ -219,20 +202,19 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
                     data-insert-idx={pans.length}
                     style={{ flex: `0 0 ${remainingWidth * unitSize}px`, minWidth: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", borderLeft: `1px dashed ${T.borderLight}` }}
                     onDragOver={(e) => {
-                      const dt = e.dataTransfer.types;
-                      if (panDragId || dt.includes("srcpanid")) return;
+                      if (!canDrop(dragKind(e), { kind: "gap", index: pans.length, afterPanId: null })) return;
                       e.preventDefault();
                       e.stopPropagation();
                       setHoverInsertIdx(pans.length);
                     }}
                     onDragLeave={() => setHoverInsertIdx((prev) => prev === pans.length ? null : prev)}
                     onDrop={(e) => {
-                      const pid = e.dataTransfer.getData("productId");
-                      const dragType = e.dataTransfer.getData("dragType");
-                      if (dragType === "product" && pid) {
+                      const source = getDragSource(e);
+                      const target = { kind: "gap", index: pans.length, afterPanId: null };
+                      if (source && canDrop(source.kind, target)) {
                         e.preventDefault();
                         e.stopPropagation();
-                        onCreatePanFromProduct(pid, pans.length);
+                        onDrop(source, target);
                       }
                       setHoverInsertIdx(null);
                     }}

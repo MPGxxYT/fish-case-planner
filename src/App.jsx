@@ -4,6 +4,7 @@ import { checkFit, clampCaseWidth, usedWidth as sumWidth } from "./case/layout.j
 import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
 import { fetchPublicProducts, upsertPublicProduct, deletePublicProduct } from "./lib/api.js";
 import { autoGenerateCase } from "./utils/autoGenerate.js";
+import { dropToEdit } from "./case/drop.js";
 import { colorClashes, indexProducts, productsInCase as placedIds } from "./case/queries.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
 import { useLayout } from "./hooks/useLayout.js";
@@ -71,8 +72,7 @@ export default function App() {
 
   const { isMobile, isPortrait } = useIsMobile();
   const [portraitDismissed, setPortraitDismissed] = useState(false);
-  const reorderPan = (panId, targetPanId, side) => dispatch({ type: "reorderPan", panId, targetPanId, side });
-  const { panDragId, insertTarget, insertTargetRef, setInsertTarget, setPanDragId, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd } = useCaseDrag(reorderPan);
+  const drag = useCaseDrag(handleDrop);
 
   const usedWidth = sumWidth(pans);
   const remainingWidth = caseWidth - usedWidth;
@@ -83,7 +83,6 @@ export default function App() {
   const productsInCase = useMemo(() => placedIds(pans), [pans]);
 
   const dividers = useMemo(() => new Set(layout.dividers), [layout.dividers]);
-  const toggleDivider = (afterPanId) => dispatch({ type: "toggleDivider", afterPanId });
 
   // Case-width input: keep the raw text decoupled from the committed/clamped
   // value so clamping mid-typing (e.g. to the width already used by pans)
@@ -116,12 +115,7 @@ export default function App() {
   const setSlotType = (panId, slot, panType) => dispatch({ type: "setSlotType", panId, slot, panType });
   const setPanWidth = (panId, width) => dispatchOrConfirmExpand({ type: "resizePan", panId, width });
   const setPanDepth = (panId, depth) => dispatch({ type: "setPanDepth", panId, depth });
-  const createPanFromProduct = (productId, index) => {
-    const product = products.find((p) => p.id === productId);
-    if (product) dispatchOrConfirmExpand({ type: "insertProductPan", product, index }, product);
-  };
   const assignProduct = (panId, slot, productId) => dispatch({ type: "assignProduct", panId, slot, productId });
-  const moveProduct = (from, to) => dispatch({ type: "moveProduct", from, to });
   const clearSlot = (panId, slotIdx) => setClearSlotConfirm({ panId, slotIdx });
   const confirmClearSlotAction = () => {
     if (!clearSlotConfirm) return;
@@ -130,12 +124,17 @@ export default function App() {
   };
   const replaceLayout = (newPans, newCaseWidth) => dispatch({ type: "replaceLayout", pans: newPans, caseWidth: newCaseWidth });
 
+  // Every drop (mouse, touch, or tap-to-place on mobile) lands here. A function
+  // declaration so useCaseDrag above can take it before this line runs.
+  function handleDrop(source, target) {
+    const edit = dropToEdit(source, target, { findProduct: (id) => products.find((p) => p.id === id), dividerEditMode });
+    if (edit) dispatchOrConfirmExpand(edit, edit.product);
+    if (source.kind === "pool" && source.productId === selectedProductId) setSelectedProductId(null);
+  }
+
   const { startTouchDrag } = useTouchDrag({
-    setInsertTarget, setPanDragId, insertTargetRef,
-    onAssignProduct: assignProduct,
-    onCreatePanFromProduct: createPanFromProduct,
-    onMoveProduct: moveProduct,
-    onReorderPan: reorderPan,
+    setInsertTarget: drag.setInsertTarget, setPanDragId: drag.setPanDragId, insertTargetRef: drag.insertTargetRef,
+    onDrop: handleDrop,
   });
 
   const handleProductSave = (prod) => {
@@ -200,11 +199,6 @@ export default function App() {
     assignProduct(slotPicker.panId, slotPicker.slotIdx, productId);
   };
 
-  const handleMobilePlaceProduct = (panId, slotIdx) => {
-    assignProduct(panId, slotIdx, selectedProductId);
-    setSelectedProductId(null);
-  };
-
   // Close drawer immediately at touchstart — safe because ProductPool stays mounted (CSS-only hide)
   const poolStartTouchDrag = (e, dragInfo, sourceEl) => { setDrawerOpen(false); startTouchDrag(e, dragInfo, sourceEl); };
   const poolProps = { products, filters, setFilters, startTouchDrag: poolStartTouchDrag, isMobile, selectedProductId, onSelectProduct: handleSelectProduct, productsInCase };
@@ -263,16 +257,12 @@ export default function App() {
 
         <CaseGrid
           pans={pans} products={products} caseWidth={caseWidth}
-          onAssignProduct={assignProduct} onClearSlot={clearSlot} onMoveProduct={moveProduct}
+          onDrop={handleDrop} onClearSlot={clearSlot} drag={drag}
           onRemovePan={handleRemovePanClick} onSetPanType={setPanType} onSetSlotType={setSlotType}
-          onSetPanWidth={setPanWidth} onSetPanDepth={setPanDepth} onCreatePanFromProduct={createPanFromProduct}
-          insertTarget={insertTarget} onPanDragStart={onPanDragStart}
-          onPanDragOver={onPanDragOver} onPanDrop={onPanDrop} onPanDragEnd={onPanDragEnd}
-          setInsertTarget={setInsertTarget} setPanDragId={setPanDragId} panDragId={panDragId}
+          onSetPanWidth={setPanWidth} onSetPanDepth={setPanDepth}
           isMobile={isMobile} isPortrait={isPortrait} startTouchDrag={startTouchDrag}
-          selectedProductId={selectedProductId} onMobilePlaceProduct={handleMobilePlaceProduct}
-          onPickProduct={handlePickProduct}
-          dividers={dividers} onToggleDivider={toggleDivider}
+          selectedProductId={selectedProductId} onPickProduct={handlePickProduct}
+          dividers={dividers}
           dividerEditMode={dividerEditMode} onToggleDividerEditMode={() => setDividerEditMode((v) => !v)}
         />
 
