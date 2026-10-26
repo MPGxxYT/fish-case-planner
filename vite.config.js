@@ -6,7 +6,14 @@ export default defineConfig({
   // In development, `npm run dev:api` serves the API; on the server nginx
   // forwards /api to it instead.
   server: {
-    proxy: { '/api': 'http://localhost:8787' },
+    // api/caseShape.js is also imported by the app, so Vite serves .js files
+    // under /api itself instead of forwarding them.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8787',
+        bypass: (req) => (req.url.split('?')[0].endsWith('.js') ? req.url : undefined),
+      },
+    },
   },
   // api/ has its own tests on Node's runner (npm run test:api).
   test: {

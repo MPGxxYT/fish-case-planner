@@ -1,6 +1,10 @@
 import { test, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
+import { DatabaseSync } from "node:sqlite";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { openStore, PAGE_SIZE } from "./store.js";
 import { createHandler } from "./app.js";
 
@@ -36,9 +40,9 @@ const call = async (method, path, body) => {
   return { status: res.status, body: await res.json() };
 };
 
-const pans = [{ id: "p1", width: 6, depth: "full", slots: { 0: "salmon" } }];
+const pans = [{ id: "p1", width: 6, depth: "full", panType: "shallow", slots: { 0: "salmon" } }];
 const salmon = { id: "salmon", name: "Atlantic Salmon", color: "warm", maxPan: 8, minPan: 6, labels: [] };
-const aCase = { name: "Monday", author: "Sam", caseWidth: 81, pans, products: [salmon] };
+const aCase = { name: "Monday", author: "Sam", caseWidth: 81, pans, dividers: [], products: [salmon] };
 
 test("a published case can be loaded by its code in any case", async () => {
   const { status, body } = await call("POST", "/cases", aCase);
@@ -131,4 +135,35 @@ test("bad requests are refused with a reason", async () => {
   assert.equal((await call("PUT", "/products/x", { id: "x" })).status, 400);
   assert.equal((await call("POST", "/cases", { ...aCase, name: "x".repeat(1_100_000) })).status, 413);
   assert.equal((await call("GET", "/nothing")).status, 404);
+});
+
+test("dividers are stored with a case, keeping only ones that still have a place", async () => {
+  const { shortCode } = (await call("POST", "/cases", { ...aCase, dividers: ["start", "p1", "gone", "p1"] })).body;
+  assert.deepEqual((await call("GET", `/cases/${shortCode}`)).body.dividers, ["start", "p1"]);
+
+  await call("PUT", `/cases/${shortCode}`, { caseWidth: 81, pans, products: [] });
+  assert.deepEqual((await call("GET", `/cases/${shortCode}`)).body.dividers, []);
+});
+
+test("a case with a malformed pan is refused with the reason", async () => {
+  const bad = { ...aCase, pans: [{ ...pans[0], width: 7 }] };
+  assert.deepEqual(await call("POST", "/cases", bad), { status: 400, body: { error: "Pan 1 has an invalid width." } });
+  const dupes = { ...aCase, pans: [pans[0], pans[0]] };
+  assert.equal((await call("POST", "/cases", dupes)).body.error, "Pan 2 has the same id as another pan.");
+});
+
+test("a database from before dividers gets the column, and its cases load with none", () => {
+  const dir = mkdtempSync(join(tmpdir(), "fcp-"));
+  const path = join(dir, "old.db");
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE published_cases (short_code TEXT PRIMARY KEY, name TEXT NOT NULL, author TEXT NOT NULL DEFAULT '',
+    case_width INTEGER NOT NULL, pans TEXT NOT NULL, products TEXT NOT NULL, created_at TEXT NOT NULL)`);
+  old.prepare("INSERT INTO published_cases VALUES (?, ?, ?, ?, ?, ?, ?)").run("OLDOLD", "Old", "", 81, JSON.stringify(pans), "[]", "2026-01-01");
+  old.close();
+
+  const upgraded = openStore(path);
+  assert.deepEqual(upgraded.getCase("OLDOLD").dividers, []);
+  upgraded.close();
+  openStore(path).close(); // opening it again must not add the column twice
+  rmSync(dir, { recursive: true, force: true });
 });
