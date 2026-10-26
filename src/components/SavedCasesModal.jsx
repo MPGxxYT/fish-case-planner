@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { T, S, FONT, DFONT } from "../utils/constants.js";
-import { isSupabaseConfigured, fetchPublicCases, fetchCaseByCode, publishCase, deletePublicCase, updatePublicCase } from "../lib/supabase.js";
+import { fetchPublicCases, fetchCaseByCode, publishCase, deletePublicCase, updatePublicCase } from "../lib/api.js";
 import CasePreview from "./CasePreview.jsx";
 
 const TAB_STYLE = (active) => ({
@@ -90,9 +90,7 @@ function LocalTab({ savedCases, products, onLoad, onDelete, onExport, onImport, 
                   <div style={{ fontSize: 10, color: T.textDim }}>{c.pans.length} pans · {c.caseWidth}w · {new Date(c.savedAt).toLocaleDateString()}</div>
                 </div>
                 <button style={{ ...S.ch, background: T.accent, color: T.bg }} onClick={(e) => { e.stopPropagation(); onLoad(c); }}>Load</button>
-                {isSupabaseConfigured && (
-                  <button style={S.ch} onClick={(e) => { e.stopPropagation(); setPublishIdx(publishIdx === i ? null : i); setPublishResult(null); }} title="Publish publicly">☁↑</button>
-                )}
+                <button style={S.ch} onClick={(e) => { e.stopPropagation(); setPublishIdx(publishIdx === i ? null : i); setPublishResult(null); }} title="Publish publicly">☁↑</button>
                 <button style={S.ch} onClick={(e) => { e.stopPropagation(); onExport(c); }} title="Export to file">↓</button>
                 <button style={S.ch} onClick={(e) => { e.stopPropagation(); setUpdateIdx(updateIdx === i ? null : i); setDeleteIdx(null); setDeleteConfirmText(""); }} title="Overwrite with current case">↺</button>
                 <button style={{ ...S.ch, background: T.danger + "33", color: T.danger }} onClick={(e) => { e.stopPropagation(); setDeleteIdx(deleteIdx === i ? null : i); setUpdateIdx(null); setDeleteConfirmText(""); }}>×</button>
@@ -301,21 +299,6 @@ function PublicTab({ products: localProducts, onLoadPublic, onClose, currentPans
   };
 
   const togglePreview = (i) => setPreviewIdx(previewIdx === i ? null : i);
-
-  if (!isSupabaseConfigured) {
-    return (
-      <div style={{ padding: "40px 20px", textAlign: "center" }}>
-        <span style={{ fontSize: 28, opacity: 0.3 }}>🌐</span>
-        <p style={{ color: T.textMuted, fontSize: 13, marginTop: 8, fontFamily: DFONT }}>Public Case Browser</p>
-        <p style={{ color: T.textDim, fontSize: 11, maxWidth: 340, margin: "8px auto 0", lineHeight: 1.5 }}>
-          Not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file to enable public case sharing.
-        </p>
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 24 }}>
-          <button style={S.bs} onClick={onClose}>Close</button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>

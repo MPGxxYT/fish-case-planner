@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { T, S, FONT, DFONT, DEFAULT_CASE_WIDTH } from "./utils/constants.js";
 import { uid, canSplitDepth } from "./utils/helpers.js";
 import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
-import { isSupabaseConfigured, fetchPublicProducts, upsertPublicProduct, deletePublicProduct } from "./lib/supabase.js";
+import { fetchPublicProducts, upsertPublicProduct, deletePublicProduct } from "./lib/api.js";
 import { autoGenerateCase } from "./utils/autoGenerate.js";
 import { checkColorConflicts } from "./utils/colorConflicts.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
@@ -23,7 +23,7 @@ const migrateColor = (c) => (c === "orange") ? "warm" : (c === "white" || c === 
 const migrateProducts = (ps) => ps.map((p) => ({ preferredZone: "", preferredSplit: "", ...p, color: migrateColor(p.color), preferredPosition: p.preferredPosition || "", labels: p.labels || [] }));
 
 export default function App() {
-  // localStorage acts as a stale-while-revalidate cache for the Supabase products table.
+  // localStorage acts as a stale-while-revalidate cache for the shared product catalog.
   // On mount, cached products are shown immediately, then the fresh fetch overwrites them.
   const [products, setProducts] = useLocalStorage("fcp3_products", [], migrateProducts);
   const [pans, setPans] = useLocalStorage("fcp3_pans", []);
@@ -52,16 +52,15 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast((t) => t === msg ? null : t), 2000); };
 
-  // On mount, load products from the shared Supabase catalog (overrides local cache)
+  // On mount, load products from the shared catalog (overrides local cache)
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
     fetchPublicProducts()
       .then((ps) => { if (ps.length > 0) setProducts(ps); })
       .catch(() => {}); // Silently fall back to localStorage on error
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshProducts = () => {
-    if (!isSupabaseConfigured || productsRefreshing) return;
+    if (productsRefreshing) return;
     setProductsRefreshing(true);
     fetchPublicProducts()
       .then((ps) => { setProducts(ps); showToast(`Products updated (${ps.length})`); })
@@ -238,7 +237,7 @@ export default function App() {
       if (idx >= 0) { const c = [...ps]; c[idx] = prod; return c; }
       return [...ps, prod];
     });
-    if (isSupabaseConfigured) upsertPublicProduct(prod).catch(() => {});
+    upsertPublicProduct(prod).catch(() => {});
   };
   const deleteProduct = (id) => {
     setProducts((ps) => ps.filter((p) => p.id !== id));
@@ -247,7 +246,7 @@ export default function App() {
       Object.keys(ns).forEach((k) => { if (ns[k] === id) ns[k] = null; });
       return { ...pan, slots: ns };
     }));
-    if (isSupabaseConfigured) deletePublicProduct(id).catch(() => {});
+    deletePublicProduct(id).catch(() => {});
   };
   const handleGenerate = (items, w) => { snapshotPans(); setCaseWidth(w); setPans(autoGenerateCase(items, w)); setShowAutoGen(false); };
   const saveCase = () => {
@@ -426,14 +425,12 @@ export default function App() {
             {isMobile && selectedProductId ? `${selectedProduct?.name} selected` : "Products"} {drawerOpen ? "▼" : "▲"}
           </span>
           <div style={{ position: "absolute", right: 16, display: "flex", gap: 6, alignItems: "center" }}>
-            {isSupabaseConfigured && (
-              <button
-                style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 8px" : "5px 10px", opacity: productsRefreshing ? 0.5 : 1 }}
-                onClick={(e) => { e.stopPropagation(); refreshProducts(); }}
-                title="Refresh product list from database"
-                disabled={productsRefreshing}
-              >{productsRefreshing ? "⟳" : "⟳"} {!isMobile && "Refresh"}</button>
-            )}
+            <button
+              style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 8px" : "5px 10px", opacity: productsRefreshing ? 0.5 : 1 }}
+              onClick={(e) => { e.stopPropagation(); refreshProducts(); }}
+              title="Refresh product list from database"
+              disabled={productsRefreshing}
+            >{productsRefreshing ? "⟳" : "⟳"} {!isMobile && "Refresh"}</button>
             <button style={{ ...S.hb, fontSize: isMobile ? 10 : 12, padding: isMobile ? "3px 10px" : "5px 14px" }} onClick={(e) => { e.stopPropagation(); setShowProductManager(true); }}>Manage</button>
           </div>
         </div>

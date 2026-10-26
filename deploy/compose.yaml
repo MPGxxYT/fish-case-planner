@@ -1,0 +1,40 @@
+# Runs on the home server in ~/fish-case-planner. The deploy job copies this
+# folder, the build (into ./dist) and the API code (into ./api) there, then
+# restarts the API and reloads nginx. The database lives in ./data, which
+# deploys never touch. Folders are mounted rather than single files, so
+# files replaced by a deploy show up inside the containers.
+services:
+  web:
+    image: nginx:1.29-alpine
+    container_name: fish-case-planner
+    restart: unless-stopped
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./conf:/etc/nginx/conf.d:ro
+    depends_on:
+      - api
+    networks:
+      - default
+      - proxy
+
+  # Only on this project's own network: nginx reaches it, the internet doesn't.
+  api:
+    image: node:24-alpine
+    container_name: fish-case-planner-api
+    restart: unless-stopped
+    working_dir: /app
+    command: ["node", "api/index.js"]
+    environment:
+      PORT: "3000"
+      DB_PATH: /data/fish-case-planner.db
+    volumes:
+      - ./api:/app/api:ro
+      - ./data:/data
+    networks:
+      - default
+
+networks:
+  # The network Nginx Proxy Manager is on, so it can reach the web container by name.
+  proxy:
+    external: true
+    name: server-stack_servernet
