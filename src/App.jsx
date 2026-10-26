@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { T, S, FONT, DFONT, DEFAULT_CASE_WIDTH } from "./utils/constants.js";
-import { uid, canSplitDepth } from "./utils/helpers.js";
+import { T, S, FONT, DFONT } from "./utils/constants.js";
+import { checkFit, clampCaseWidth, usedWidth as sumWidth } from "./case/layout.js";
 import { exportCaseToFile, readCaseFile } from "./utils/caseFile.js";
 import { fetchPublicProducts, upsertPublicProduct, deletePublicProduct } from "./lib/api.js";
 import { autoGenerateCase } from "./utils/autoGenerate.js";
 import { checkColorConflicts } from "./utils/colorConflicts.js";
 import { useLocalStorage } from "./hooks/useLocalStorage.js";
+import { useLayout } from "./hooks/useLayout.js";
 import { useCaseDrag } from "./hooks/useCaseDrag.js";
 import { useIsMobile } from "./hooks/useIsMobile.js";
 import { useTouchDrag } from "./hooks/useTouchDrag.js";
@@ -26,11 +27,10 @@ export default function App() {
   // localStorage acts as a stale-while-revalidate cache for the shared product catalog.
   // On mount, cached products are shown immediately, then the fresh fetch overwrites them.
   const [products, setProducts] = useLocalStorage("fcp3_products", [], migrateProducts);
-  const [pans, setPans] = useLocalStorage("fcp3_pans", []);
-  const [caseWidth, setCaseWidth] = useLocalStorage("fcp3_cw", DEFAULT_CASE_WIDTH);
+  const { layout, dispatch, undo, redo, canUndo, canRedo } = useLayout();
+  const { pans, caseWidth } = layout;
   const [caseWidthDraft, setCaseWidthDraft] = useState(String(caseWidth));
   const caseWidthFocused = useRef(false);
-  const [dividerList, setDividerList] = useLocalStorage("fcp3_dividers", []);
   const [dividerEditMode, setDividerEditMode] = useState(false);
   const [savedCases, setSavedCases] = useLocalStorage("fcp3_sc", []);
   const [filters, setFilters] = useState({ color: "", cookType: "", fishType: "", deepShallow: "", sort: "name", hideInCase: false });
@@ -43,9 +43,7 @@ export default function App() {
   const [showSaveInput, setShowSaveInput] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearSlotConfirm, setClearSlotConfirm] = useState(null);
-  const [confirmExpand, setConfirmExpand] = useState(null);
-  const [pansHistory, setPansHistory] = useState([]);
-  const [pansRedo, setPansRedo] = useState([]);
+  const [confirmExpand, setConfirmExpand] = useState(null); // { edit, requiredWidth, product? }
   const [confirmRemovePan, setConfirmRemovePan] = useState(null);
   const [slotPicker, setSlotPicker] = useState(null); // { panId, slotIdx }
   const [productsRefreshing, setProductsRefreshing] = useState(false);
@@ -73,9 +71,10 @@ export default function App() {
 
   const { isMobile, isPortrait } = useIsMobile();
   const [portraitDismissed, setPortraitDismissed] = useState(false);
-  const { panDragId, insertTarget, insertTargetRef, setInsertTarget, setPanDragId, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd } = useCaseDrag(setPans);
+  const reorderPan = (panId, targetPanId, side) => dispatch({ type: "reorderPan", panId, targetPanId, side });
+  const { panDragId, insertTarget, insertTargetRef, setInsertTarget, setPanDragId, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd } = useCaseDrag(reorderPan);
 
-  const usedWidth = pans.reduce((s, p) => s + p.width, 0);
+  const usedWidth = sumWidth(pans);
   const remainingWidth = caseWidth - usedWidth;
   const colorWarnings = useMemo(() => checkColorConflicts(pans, products), [pans, products]);
 
@@ -85,14 +84,8 @@ export default function App() {
     return s;
   }, [pans]);
 
-  const dividers = useMemo(() => new Set(dividerList), [dividerList]);
-  const toggleDivider = (afterPanId) => {
-    setDividerList((prev) => {
-      const s = new Set(prev);
-      if (s.has(afterPanId)) s.delete(afterPanId); else s.add(afterPanId);
-      return [...s];
-    });
-  };
+  const dividers = useMemo(() => new Set(layout.dividers), [layout.dividers]);
+  const toggleDivider = (afterPanId) => dispatch({ type: "toggleDivider", afterPanId });
 
   // Case-width input: keep the raw text decoupled from the committed/clamped
   // value so clamping mid-typing (e.g. to the width already used by pans)
@@ -101,134 +94,50 @@ export default function App() {
     if (!caseWidthFocused.current) setCaseWidthDraft(String(caseWidth));
   }, [caseWidth]);
   const commitCaseWidth = (raw) => {
-    const n = parseInt(raw, 10);
-    const clamped = Number.isFinite(n) ? Math.min(208, Math.max(usedWidth, Math.max(1, n))) : caseWidth;
-    setCaseWidth(clamped);
+    const clamped = clampCaseWidth(layout, raw);
+    dispatch({ type: "setCaseWidth", width: clamped });
     setCaseWidthDraft(String(clamped));
   };
 
-  const MAX_HISTORY = 20;
-  const snapshotPans = () => {
-    setPansHistory((h) => [...h.slice(-(MAX_HISTORY - 1)), pans]);
-    setPansRedo([]);
-  };
-  const handleUndo = () => {
-    if (pansHistory.length === 0) return;
-    setPansRedo((r) => [...r, pans]);
-    setPans(pansHistory[pansHistory.length - 1]);
-    setPansHistory((h) => h.slice(0, -1));
-  };
-  const handleRedo = () => {
-    if (pansRedo.length === 0) return;
-    setPansHistory((h) => [...h.slice(-(MAX_HISTORY - 1)), pans]);
-    setPans(pansRedo[pansRedo.length - 1]);
-    setPansRedo((r) => r.slice(0, -1));
-  };
-
-  const addPan = (w, d, pt) => {
-    if (w > remainingWidth) return;
-    snapshotPans();
-    const sc = d === "half" ? 2 : d === "third" ? 3 : 1;
-    const slots = {};
-    for (let i = 0; i < sc; i++) slots[i] = null;
-    setPans((p) => [...p, { id: uid(), width: w, depth: d, panType: pt, slots }]);
-  };
-  const removePan = (id) => { snapshotPans(); setPans((p) => p.filter((x) => x.id !== id)); };
-  const handleRemovePanClick = (id) => setConfirmRemovePan(id);
-  const confirmRemovePanAction = () => { removePan(confirmRemovePan); setConfirmRemovePan(null); };
-  const setPanType = (id, t) => setPans((p) => p.map((pan) => (pan.id === id ? { ...pan, panType: t } : pan)));
-  const setSlotType = (panId, slotIdx, type) => setPans((p) => p.map((pan) => {
-    if (pan.id !== panId) return pan;
-    return { ...pan, slotTypes: { ...pan.slotTypes, [slotIdx]: type } };
-  }));
-  const applyPanWidth = (panId, newWidth) => {
-    snapshotPans();
-    setPans((p) => p.map((pan) => {
-      if (pan.id !== panId) return pan;
-      const updated = { ...pan, width: newWidth };
-      if (!canSplitDepth(newWidth) && pan.depth !== "full") {
-        updated.depth = "full";
-        updated.slots = { 0: pan.slots[0] || null };
-        updated.slotTypes = undefined;
-      }
-      return updated;
-    }));
-  };
-  const setPanWidth = (panId, newWidth) => {
-    const pan = pans.find((p) => p.id === panId);
-    const currentUsed = pans.reduce((s, p) => s + p.width, 0);
-    const overflow = (currentUsed - (pan?.width ?? 0) + newWidth) - caseWidth;
-    if (overflow > 0) {
-      setConfirmExpand({ type: "resize", panId, newWidth, newCaseWidth: caseWidth + overflow });
-      return;
-    }
-    applyPanWidth(panId, newWidth);
-  };
-  const setPanDepth = (panId, newDepth) => {
-    snapshotPans();
-    setPans((p) => p.map((pan) => {
-      if (pan.id !== panId) return pan;
-      const oldSlotCount = pan.depth === "half" ? 2 : pan.depth === "third" ? 3 : 1;
-      const newSlotCount = newDepth === "half" ? 2 : newDepth === "third" ? 3 : 1;
-      const updated = { ...pan, depth: newDepth };
-      if (newSlotCount !== oldSlotCount) {
-        const newSlots = {};
-        for (let i = 0; i < newSlotCount; i++) newSlots[i] = pan.slots[i] || null;
-        updated.slots = newSlots;
-        if (pan.slotTypes) {
-          const newSlotTypes = {};
-          for (let i = 0; i < newSlotCount; i++) {
-            if (pan.slotTypes[i] !== undefined) newSlotTypes[i] = pan.slotTypes[i];
-          }
-          updated.slotTypes = Object.keys(newSlotTypes).length > 0 ? newSlotTypes : undefined;
-        }
-      }
-      return updated;
-    }));
-  };
-  const createPanFromProduct = (productId, insertIdx) => {
-    const prod = products.find((p) => p.id === productId);
-    if (!prod) return;
-    if (prod.minPan > remainingWidth) {
-      setConfirmExpand({ productId, insertIdx, product: prod });
-      return;
-    }
-    const newPan = { id: uid(), width: prod.minPan, depth: "full", panType: prod.deepShallow, slots: { 0: productId } };
-    snapshotPans();
-    setPans((p) => { const a = [...p]; a.splice(insertIdx, 0, newPan); return a; });
+  // Edits that can grow the case ask before expanding it.
+  const dispatchOrConfirmExpand = (edit, product) => {
+    const { fits, requiredWidth } = checkFit(layout, edit);
+    if (fits) dispatch(edit);
+    else setConfirmExpand({ edit, requiredWidth, product });
   };
   const confirmExpandAction = () => {
     if (!confirmExpand) return;
-    if (confirmExpand.type === "resize") {
-      const { panId, newWidth, newCaseWidth } = confirmExpand;
-      setCaseWidth(Math.min(208, newCaseWidth));
-      applyPanWidth(panId, newWidth);
-    } else {
-      const { productId, insertIdx, product } = confirmExpand;
-      const newPan = { id: uid(), width: product.minPan, depth: "full", panType: product.deepShallow, slots: { 0: productId } };
-      const currentUsed = pans.reduce((s, p) => s + p.width, 0);
-      snapshotPans();
-      setCaseWidth(Math.min(208, currentUsed + product.minPan));
-      setPans((p) => { const a = [...p]; a.splice(insertIdx, 0, newPan); return a; });
-    }
+    dispatch({ ...confirmExpand.edit, expandCase: true });
     setConfirmExpand(null);
   };
-  const assignProduct = (panId, slotIdx, productId) => setPans((p) => p.map((pan) => (pan.id === panId ? { ...pan, slots: { ...pan.slots, [slotIdx]: productId } } : pan)));
-  const directClearSlot = (panId, slotIdx) => setPans((p) => p.map((pan) => (pan.id === panId ? { ...pan, slots: { ...pan.slots, [slotIdx]: null } } : pan)));
+
+  const addPan = (width, depth, panType) => dispatch({ type: "addPan", width, depth, panType });
+  const handleRemovePanClick = (id) => setConfirmRemovePan(id);
+  const confirmRemovePanAction = () => { dispatch({ type: "removePan", panId: confirmRemovePan }); setConfirmRemovePan(null); };
+  const setPanType = (panId, panType) => dispatch({ type: "setPanType", panId, panType });
+  const setSlotType = (panId, slot, panType) => dispatch({ type: "setSlotType", panId, slot, panType });
+  const setPanWidth = (panId, width) => dispatchOrConfirmExpand({ type: "resizePan", panId, width });
+  const setPanDepth = (panId, depth) => dispatch({ type: "setPanDepth", panId, depth });
+  const createPanFromProduct = (productId, index) => {
+    const product = products.find((p) => p.id === productId);
+    if (product) dispatchOrConfirmExpand({ type: "insertProductPan", product, index }, product);
+  };
+  const assignProduct = (panId, slot, productId) => dispatch({ type: "assignProduct", panId, slot, productId });
+  const moveProduct = (from, to) => dispatch({ type: "moveProduct", from, to });
   const clearSlot = (panId, slotIdx) => setClearSlotConfirm({ panId, slotIdx });
   const confirmClearSlotAction = () => {
     if (!clearSlotConfirm) return;
-    snapshotPans();
-    directClearSlot(clearSlotConfirm.panId, clearSlotConfirm.slotIdx);
+    dispatch({ type: "clearSlot", panId: clearSlotConfirm.panId, slot: clearSlotConfirm.slotIdx });
     setClearSlotConfirm(null);
   };
+  const replaceLayout = (newPans, newCaseWidth) => dispatch({ type: "replaceLayout", pans: newPans, caseWidth: newCaseWidth });
 
   const { startTouchDrag } = useTouchDrag({
     setInsertTarget, setPanDragId, insertTargetRef,
     onAssignProduct: assignProduct,
     onCreatePanFromProduct: createPanFromProduct,
-    onDirectClearSlot: directClearSlot,
-    pans, setPans,
+    onMoveProduct: moveProduct,
+    onReorderPan: reorderPan,
   });
 
   const handleProductSave = (prod) => {
@@ -241,21 +150,17 @@ export default function App() {
   };
   const deleteProduct = (id) => {
     setProducts((ps) => ps.filter((p) => p.id !== id));
-    setPans((ps) => ps.map((pan) => {
-      const ns = { ...pan.slots };
-      Object.keys(ns).forEach((k) => { if (ns[k] === id) ns[k] = null; });
-      return { ...pan, slots: ns };
-    }));
+    dispatch({ type: "removeProductEverywhere", productId: id });
     deletePublicProduct(id).catch(() => {});
   };
-  const handleGenerate = (items, w) => { snapshotPans(); setCaseWidth(w); setPans(autoGenerateCase(items, w)); setShowAutoGen(false); };
+  const handleGenerate = (items, w) => { replaceLayout(autoGenerateCase(items, w), w); setShowAutoGen(false); };
   const saveCase = () => {
     if (!saveName.trim()) return;
     setSavedCases((sc) => [...sc, { name: saveName.trim(), pans: JSON.parse(JSON.stringify(pans)), caseWidth, savedAt: new Date().toISOString() }]);
     setSaveName("");
     setShowSaveInput(false);
   };
-  const loadCase = (c) => { snapshotPans(); setPans(c.pans); setCaseWidth(c.caseWidth); setShowSaved(false); showToast(`Loaded "${c.name}"`); };
+  const loadCase = (c) => { replaceLayout(c.pans, c.caseWidth); setShowSaved(false); showToast(`Loaded "${c.name}"`); };
   const deleteCase = (idx) => setSavedCases((sc) => sc.filter((_, i) => i !== idx));
   const updateLocalCase = (idx) => {
     setSavedCases((sc) => sc.map((c, i) => i === idx ? { ...c, pans: JSON.parse(JSON.stringify(pans)), caseWidth, savedAt: new Date().toISOString() } : c));
@@ -277,9 +182,7 @@ export default function App() {
     }
   };
   const loadPublicCase = (c) => {
-    snapshotPans();
-    setPans(c.pans);
-    setCaseWidth(c.caseWidth);
+    replaceLayout(c.pans, c.caseWidth);
     setShowSaved(false);
     showToast(`Loaded "${c.name}"`);
   };
@@ -296,7 +199,6 @@ export default function App() {
   const handlePickProduct = (panId, slotIdx) => setSlotPicker({ panId, slotIdx });
   const handleSlotPickerAssign = (productId) => {
     if (!slotPicker) return;
-    snapshotPans();
     assignProduct(slotPicker.panId, slotPicker.slotIdx, productId);
   };
 
@@ -355,15 +257,15 @@ export default function App() {
             <button style={S.ch} onClick={() => setShowSaveInput(true)}>💾 Save</button>
           )}
           <button style={{ ...S.ch, color: T.danger }} onClick={() => setConfirmClear(true)}>🗑 Clear</button>
-          <button style={{ ...S.ch, opacity: pansHistory.length === 0 ? 0.35 : 1 }} disabled={pansHistory.length === 0} onClick={handleUndo}>↩ Undo</button>
-          <button style={{ ...S.ch, opacity: pansRedo.length === 0 ? 0.35 : 1 }} disabled={pansRedo.length === 0} onClick={handleRedo}>↪ Redo</button>
+          <button style={{ ...S.ch, opacity: canUndo ? 1 : 0.35 }} disabled={!canUndo} onClick={undo}>↩ Undo</button>
+          <button style={{ ...S.ch, opacity: canRedo ? 1 : 0.35 }} disabled={!canRedo} onClick={redo}>↪ Redo</button>
         </div>
 
         <AddPanControls onAddPan={addPan} remainingWidth={remainingWidth} dividerEditMode={dividerEditMode} />
 
         <CaseGrid
           pans={pans} products={products} caseWidth={caseWidth}
-          onAssignProduct={assignProduct} onClearSlot={clearSlot} onDirectClearSlot={directClearSlot}
+          onAssignProduct={assignProduct} onClearSlot={clearSlot} onMoveProduct={moveProduct}
           onRemovePan={handleRemovePanClick} onSetPanType={setPanType} onSetSlotType={setSlotType}
           onSetPanWidth={setPanWidth} onSetPanDepth={setPanDepth} onCreatePanFromProduct={createPanFromProduct}
           insertTarget={insertTarget} onPanDragStart={onPanDragStart}
@@ -455,13 +357,13 @@ export default function App() {
       {showAutoGen && <AutoGenModal products={products} savedCases={savedCases} onGenerate={handleGenerate} onClose={() => setShowAutoGen(false)} />}
       {showPrint && <PrintView pans={pans} products={products} caseWidth={caseWidth} onClose={() => setShowPrint(false)} />}
       {showSaved && <SavedCasesModal savedCases={savedCases} products={products} onLoad={loadCase} onDelete={deleteCase} onExport={exportCase} onImport={importCaseFile} onLoadPublic={loadPublicCase} onUpdateLocal={updateLocalCase} onSavePublicToLocal={savePublicToLocal} currentPans={pans} currentCaseWidth={caseWidth} onClose={() => setShowSaved(false)} />}
-      {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { snapshotPans(); setPans([]); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
+      {confirmClear && <ConfirmDialog message="Clear all pans from the case?" onConfirm={() => { replaceLayout([], caseWidth); setConfirmClear(false); }} onCancel={() => setConfirmClear(false)} confirmLabel="Clear" />}
       {confirmRemovePan && <ConfirmDialog message="Remove this pan? Any products in its slots will be unassigned." onConfirm={confirmRemovePanAction} onCancel={() => setConfirmRemovePan(null)} confirmLabel="Remove" />}
       {clearSlotConfirm && <ConfirmDialog message="Remove product from this slot? Consider editing instead if this was a mistake." onConfirm={confirmClearSlotAction} onCancel={() => setClearSlotConfirm(null)} confirmLabel="Remove" />}
       {confirmExpand && <ConfirmDialog
-        message={confirmExpand.type === "resize"
-          ? `Resizing this pan to ${confirmExpand.newWidth} won't fit — the case would need to expand to ${confirmExpand.newCaseWidth} units. Expand the case?`
-          : `No room for ${confirmExpand.product.name} — needs ${confirmExpand.product.minPan} units but only ${remainingWidth} left. Add anyway and expand the case to ${pans.reduce((s, p) => s + p.width, 0) + confirmExpand.product.minPan}?`}
+        message={confirmExpand.edit.type === "resizePan"
+          ? `Resizing this pan to ${confirmExpand.edit.width} won't fit — the case would need to expand to ${confirmExpand.requiredWidth} units. Expand the case?`
+          : `No room for ${confirmExpand.product.name} — needs ${confirmExpand.product.minPan} units but only ${remainingWidth} left. Add anyway and expand the case to ${confirmExpand.requiredWidth}?`}
         onConfirm={confirmExpandAction}
         onCancel={() => setConfirmExpand(null)}
         confirmLabel="Expand & Apply"

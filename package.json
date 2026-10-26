@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test:api": "node --test \"api/*.test.js\"",
     "check:server": "node scripts/check-server.mjs",
-    "export:supabase": "node --env-file=.env scripts/export-supabase.mjs"
+    "export:supabase": "node --env-file=.env scripts/export-supabase.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "react": "^19.2.4",
@@ -18,7 +19,8 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.7.0",
-    "vite": "^6.4.1"
+    "vite": "^6.4.1",
+    "vitest": "^3.2.7"
   },
   "engines": {
     "node": ">=24"

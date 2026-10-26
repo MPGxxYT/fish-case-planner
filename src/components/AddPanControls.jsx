@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { T, S, FONT, PAN_WIDTHS, PAN_DEPTHS_SPLIT } from "../utils/constants.js";
-import { canSplitDepth } from "../utils/helpers.js";
+import { canSplitDepth } from "../case/layout.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { DIVIDER_COLOR } from "./CaseGrid.jsx";
 

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 
 const DRAG_THRESHOLD = 8; // px before drag starts
 
-export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, onAssignProduct, onCreatePanFromProduct, onDirectClearSlot, pans, setPans }) {
+export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, onAssignProduct, onCreatePanFromProduct, onMoveProduct, onReorderPan }) {
   const dragStateRef = useRef({
     active: false,
     type: null,
@@ -21,10 +21,6 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
 
   // Tiny React state just to expose whether a drag is active (for cursors etc.)
   const [isDragging, setIsDragging] = useState(false);
-
-  // Keep a ref to pans so handlers always see the latest value without re-closure
-  const pansRef = useRef(pans);
-  pansRef.current = pans;
 
   function resetDragState() {
     dragStateRef.current = {
@@ -108,17 +104,7 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
     const it = insertTargetRef.current;
     const dragId = dragStateRef.current.panId;
     if (!it || !dragId) return;
-    setPans((prev) => {
-      const arr = [...prev];
-      const si = arr.findIndex((p) => p.id === dragId);
-      if (si === -1) return prev;
-      const [moved] = arr.splice(si, 1);
-      let ti = arr.findIndex((p) => p.id === it.panId);
-      if (ti === -1) return prev;
-      if (it.side === "right") ti += 1;
-      arr.splice(ti, 0, moved);
-      return arr;
-    });
+    onReorderPan(dragId, it.panId, it.side);
   }
 
   function handleProductDrop(el) {
@@ -145,13 +131,7 @@ export function useTouchDrag({ setInsertTarget, setPanDragId, insertTargetRef, o
     if (!productId) return;
     const slotEl = el?.closest("[data-drop-type='slot']");
     if (slotEl) {
-      const panId = slotEl.dataset.panId;
-      const slotIdx = +slotEl.dataset.slotIdx;
-      const targetPan = pansRef.current.find((p) => p.id === panId);
-      const cur = targetPan?.slots[slotIdx] ?? null;
-      onAssignProduct(panId, slotIdx, productId);
-      if (cur) onAssignProduct(srcPanId, srcSlotIdx, cur);
-      else onDirectClearSlot(srcPanId, srcSlotIdx);
+      onMoveProduct({ panId: srcPanId, slot: srcSlotIdx }, { panId: slotEl.dataset.panId, slot: +slotEl.dataset.slotIdx });
     }
   }
 

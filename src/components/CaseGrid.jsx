@@ -112,7 +112,7 @@ function getPanSummary(pans) {
   return Object.entries(counts).map(([k, v]) => `${k} (${v})`).join(", ");
 }
 
-export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onDirectClearSlot, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, isPortrait, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct, dividers = new Set(), onToggleDivider, dividerEditMode = false, onToggleDividerEditMode }) {
+export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, onClearSlot, onMoveProduct, onRemovePan, onSetPanType, onSetSlotType, onSetPanWidth, onSetPanDepth, onCreatePanFromProduct, insertTarget, onPanDragStart, onPanDragOver, onPanDrop, onPanDragEnd, setInsertTarget, setPanDragId, panDragId, isMobile, isPortrait, startTouchDrag, selectedProductId, onMobilePlaceProduct, onPickProduct, dividers = new Set(), onToggleDivider, dividerEditMode = false, onToggleDividerEditMode }) {
   const caseRef = useRef();
   const [containerWidth, setContainerWidth] = useState(800);
   const [hoverInsertIdx, setHoverInsertIdx] = useState(null);
@@ -197,7 +197,7 @@ export default function CaseGrid({ pans, products, caseWidth, onAssignProduct, o
                   <span key={pan.id} style={{ display: "contents" }}>
                     <PanColumn
                       pan={pan} products={products}
-                      onAssignProduct={onAssignProduct} onClearSlot={onClearSlot} onDirectClearSlot={onDirectClearSlot}
+                      onAssignProduct={onAssignProduct} onClearSlot={onClearSlot} onMoveProduct={onMoveProduct}
                       unitSize={unitSize} onRemovePan={onRemovePan} onSetPanType={onSetPanType}
                       onSetSlotType={onSetSlotType} onSetPanWidth={onSetPanWidth} onSetPanDepth={onSetPanDepth}
                       remainingWidth={remainingWidth}
