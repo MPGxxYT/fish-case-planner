@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { T, S, FONT, PAN_WIDTHS, PAN_DEPTHS_SPLIT } from "../utils/constants.js";
+import { T, S, FONT, DFONT, PAN_WIDTHS, PAN_DEPTHS_SPLIT } from "../utils/constants.js";
 import { canSplitDepth } from "../case/layout.js";
 import { setDragSource } from "../utils/dragData.js";
 import { useIsMobile } from "../hooks/useIsMobile.js";
 import { DIVIDER_COLOR } from "./CaseGrid.jsx";
+import { Group, Choice, TypeChoices } from "./PanSheet.jsx";
 
 const KEY_WIDTH_MAP = { "3": 3, "6": 6, "8": 8, "0": 12 };
 const KEY_DEPTH_MAP = { q: "full", w: "half", e: "third" };
@@ -17,8 +18,6 @@ export default function AddPanControls({ onAddPan, remainingWidth, dividerEditMo
   const { isMobile } = useIsMobile();
 
   const ad = canSplitDepth(w) ? PAN_DEPTHS_SPLIT : ["full"];
-  // Phones get 44px tap targets.
-  const tap = isMobile ? { minHeight: 44, minWidth: 44, fontSize: 13 } : {};
 
   useEffect(() => {
     if (!canSplitDepth(w)) setD("full");
@@ -63,6 +62,40 @@ export default function AddPanControls({ onAddPan, remainingWidth, dividerEditMo
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [kbMode, handleKeyDown]);
 
+  // Phones get the same rows as the Pan sheet: one choice per row, one clear Add button.
+  if (isMobile) {
+    const fits = w <= remainingWidth;
+    const depthLabel = { full: "", half: " half", third: " third" }[d];
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, padding: 14, background: T.surface, borderRadius: 12, border: `1px solid ${T.border}`, fontFamily: DFONT }}>
+        <Group label={`Width · ${remainingWidth} left in the case`}>
+          {PAN_WIDTHS.map((v) => (
+            <Choice key={v} mono active={w === v} onClick={() => setW(v)}>{v}</Choice>
+          ))}
+        </Group>
+        {canSplitDepth(w) ? (
+          <Group label="Split">
+            {PAN_DEPTHS_SPLIT.map((v) => (
+              <Choice key={v} active={d === v} onClick={() => setD(v)}>{v === "full" ? "Full" : v === "half" ? "Half" : "Third"}</Choice>
+            ))}
+          </Group>
+        ) : (
+          <div style={{ fontSize: 12, color: T.textMuted }}>{w}-wide pans are always full depth.</div>
+        )}
+        <Group label="Pan type">
+          <TypeChoices value={pt} onChange={setPt} />
+        </Group>
+        <button
+          onClick={() => onAddPan(w, d, pt)}
+          disabled={!fits}
+          style={{ minHeight: 52, borderRadius: 10, border: "none", fontSize: 15, fontWeight: 700, fontFamily: DFONT, cursor: fits ? "pointer" : "not-allowed", background: fits ? T.accent : T.surfaceAlt, color: fits ? T.bg : T.textMuted }}
+        >
+          {fits ? `Add ${w}-wide${depthLabel} ${pt} pan` : `Only ${remainingWidth} units left for a ${w}-wide pan`}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "8px 12px", background: T.surfaceAlt, borderRadius: kbMode ? "8px 8px 0 0" : 8, border: `1px solid ${T.border}`, borderBottom: kbMode ? `1px solid ${T.accent}33` : `1px solid ${T.border}` }}>
@@ -96,23 +129,23 @@ export default function AddPanControls({ onAddPan, remainingWidth, dividerEditMo
             <span style={{ fontSize: 10, color: T.textMuted, fontFamily: FONT }}>Divider</span>
           </div>
         )}
-        <button style={{ ...S.bp, opacity: w > remainingWidth ? 0.3 : 1, fontSize: 12, padding: "5px 14px", ...tap }} disabled={w > remainingWidth} onClick={() => onAddPan(w, d, pt)}>+ Add</button>
+        <button style={{ ...S.bp, opacity: w > remainingWidth ? 0.3 : 1, fontSize: 12, padding: "5px 14px" }} disabled={w > remainingWidth} onClick={() => onAddPan(w, d, pt)}>+ Add</button>
         <span style={{ fontSize: 11, color: T.textMuted, fontFamily: FONT, fontWeight: 700 }}>Pan</span>
         <div style={{ display: "flex", gap: 3 }}>
           {PAN_WIDTHS.map((v) => (
-            <button key={v} onClick={() => setW(v)} style={{ ...S.ch, ...tap, background: w === v ? T.accent : T.surface, color: w === v ? T.bg : T.textMuted, fontWeight: w === v ? 800 : 500 }}>{v}</button>
+            <button key={v} onClick={() => setW(v)} style={{ ...S.ch, background: w === v ? T.accent : T.surface, color: w === v ? T.bg : T.textMuted, fontWeight: w === v ? 800 : 500 }}>{v}</button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 3 }}>
           {ad.map((v) => (
-            <button key={v} onClick={() => setD(v)} style={{ ...S.ch, fontSize: 10, ...tap, background: d === v ? T.accent : T.surface, color: d === v ? T.bg : T.textMuted }}>
+            <button key={v} onClick={() => setD(v)} style={{ ...S.ch, fontSize: 10, background: d === v ? T.accent : T.surface, color: d === v ? T.bg : T.textMuted }}>
               {v === "full" ? "Full" : v === "half" ? "Half" : "Third"}
             </button>
           ))}
         </div>
         <div style={{ display: "flex", gap: 3 }}>
           {["shallow", "deep"].map((v) => (
-            <button key={v} onClick={() => setPt(v)} style={{ ...S.ch, fontSize: 10, ...tap, background: pt === v ? (v === "deep" ? "#3b82f6" : "#f59e0b") : T.surface, color: pt === v ? T.bg : T.textMuted }}>
+            <button key={v} onClick={() => setPt(v)} style={{ ...S.ch, fontSize: 10, background: pt === v ? (v === "deep" ? "#3b82f6" : "#f59e0b") : T.surface, color: pt === v ? T.bg : T.textMuted }}>
               {v === "shallow" ? "Shallow" : "Deep"}
             </button>
           ))}
