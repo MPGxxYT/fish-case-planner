@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { T, FONT, DFONT, PRODUCT_COLORS, DEPTH_UNITS, CASE_DEPTH, PRODUCT_LABELS } from "../utils/constants.js";
 import { getSlotLabel } from "../utils/helpers.js";
-import { setDragSource, getDragSource, dragKind } from "../utils/dragData.js";
+import { setDragSource, getDragSource, dragKind, mouseDrag } from "../utils/dragData.js";
 import { canDrop } from "../case/drop.js";
 
 export default function PanSlot({ pan, slotIdx, products, onDrop, totalDepthSlots, startTouchDrag, selectedProductId, onPickProduct }) {
@@ -31,7 +31,7 @@ export default function PanSlot({ pan, slotIdx, products, onDrop, totalDepthSlot
       data-drop-type="slot"
       data-pan-id={pan.id}
       data-slot-idx={slotIdx}
-      draggable={!!product}
+      draggable={mouseDrag && !!product}
       onClick={handleSlotClick}
       onDragStart={source ? (e) => { e.stopPropagation(); setDragSource(e, source); } : undefined}
       onTouchStart={source ? (e) => startTouchDrag(e, source, slotRef) : undefined}
