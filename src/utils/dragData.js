@@ -6,6 +6,11 @@
 // exposes types, and drop zones need the kind to decide whether to accept.
 const PREFIX = "x-fishcase/";
 
+// Pan headers and Slots drag with useTouchDrag on touch screens. Marking them
+// draggable there lets the browser start its own drag on a longer press, which
+// takes over the touch and freezes the touch drag, so only a mouse gets it.
+export const mouseDrag = typeof window !== "undefined" && !window.matchMedia?.("(pointer: coarse)").matches;
+
 export function setDragSource(e, source) {
   e.dataTransfer.setData(PREFIX + source.kind, JSON.stringify(source));
   e.dataTransfer.effectAllowed = "move";

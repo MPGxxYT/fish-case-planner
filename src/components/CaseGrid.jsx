@@ -176,6 +176,8 @@ export default function CaseGrid({ pans, products, caseWidth, onDrop, onOpenPanS
             }}
             onDragOver={(e) => e.preventDefault()}
             onDrop={() => { setHoverInsertIdx(null); drag.reset(); }}
+            // A long press here is a drag, not the browser's menu
+            onContextMenu={(e) => e.preventDefault()}
           >
             {pans.length === 0 ? (
               <div

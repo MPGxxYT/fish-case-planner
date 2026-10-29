@@ -1,13 +1,15 @@
 import { useRef } from "react";
 import { T, FONT } from "../utils/constants.js";
 import { getDepthSlots } from "../utils/helpers.js";
-import { setDragSource } from "../utils/dragData.js";
+import { setDragSource, mouseDrag } from "../utils/dragData.js";
 import PanSlot from "./PanSlot.jsx";
 
 export default function PanColumn({ pan, position, products, onDrop, unitSize, onOpenPanSheet, insertIndicator, drag, startTouchDrag, isMobile, selectedProductId, onPickProduct }) {
   const ds = getDepthSlots(pan.depth);
   const isSplit = pan.depth !== "full";
   const headerRef = useRef();
+  // A 3-wide Pan on a phone is too narrow for the width and badge side by side
+  const narrow = pan.width * unitSize < 36;
 
   return (
     <div style={{ position: "relative", display: "flex", height: "100%" }}>
@@ -28,7 +30,7 @@ export default function PanColumn({ pan, position, products, onDrop, unitSize, o
           role="button"
           tabIndex={0}
           aria-label={`Pan ${position}, ${pan.width} wide, ${pan.depth}${isSplit ? "" : `, ${pan.panType}`}. Edit pan`}
-          draggable
+          draggable={mouseDrag}
           onDragStart={(e) => { setDragSource(e, { kind: "pan", panId: pan.id }); drag.onPanDragStart(e, pan.id); }}
           onDragEnd={drag.onPanDragEnd}
           onTouchStart={(e) => startTouchDrag(e, { kind: "pan", panId: pan.id }, headerRef)}
@@ -36,8 +38,8 @@ export default function PanColumn({ pan, position, products, onDrop, unitSize, o
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenPanSheet(pan.id); } }}
           style={{
             height: isMobile ? 44 : 34, background: T.surfaceAlt, borderBottom: `1px solid ${T.border}`,
-            display: "flex", alignItems: "center", justifyContent: "center", gap: 4, flexShrink: 0, position: "relative",
-            cursor: "pointer",
+            display: "flex", flexDirection: narrow ? "column" : "row", alignItems: "center", justifyContent: "center",
+            gap: narrow ? 1 : 4, lineHeight: 1, flexShrink: 0, position: "relative", cursor: "pointer",
           }}
         >
           <span style={{ fontSize: 16, fontWeight: 800, color: T.accent, fontFamily: FONT }}>{pan.width}</span>
